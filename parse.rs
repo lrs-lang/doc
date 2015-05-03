@@ -2,16 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+//! Parser for the cancerous rustdoc JSON output
+
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::error::{self, InvalidArgument};
 use lrs::vec::{SVec};
 use lrs::string::{SByteString, AsByteStr};
 use lrs::bx::{Box};
 use lrs::rc::{Arc};
+use lrs::cell::{RefCell};
 
 use json::{Slice, Value};
-use ast::*;
+use tree::*;
 use hashmap::{ItemMap};
+use markup::{self};
 
 macro_rules! error {
     ($fmt:expr) => { error!(concat!($fmt, "{}"), "") };
@@ -19,22 +23,6 @@ macro_rules! error {
         errln!(concat!("lrs_doc: Error: ", $fmt), $($arg)*);
         return Err(error::InvalidArgument);
     }};
-}
-
-macro_rules! warning {
-    ($fmt:expr) => { warning!(concat!($fmt, "{}"), "") };
-    ($fmt:expr, $($arg:tt)*) => {{
-        errln!(concat!("lrs_doc: Warning: ", $fmt), $($arg)*);
-    }};
-}
-
-macro_rules! box_try {
-    ($e:expr) => {
-        match $e {
-            Ok(e) => e,
-            Err((_, e)) => return Err(e),
-        }
-    }
 }
 
 pub const SCHEMA: &'static [u8] = b"0.8.3";
@@ -51,7 +39,9 @@ pub fn parse(json: &Value) -> Result<Crate> {
                  schema);
     }
 
-    krate(fields[1].1.unwrap(), &mut map)
+    let krate = try!(krate(fields[1].1.unwrap(), &mut map));
+
+    Ok(krate)
 }
 
 fn krate(json: &Value, map: &mut ItemMap) -> Result<Crate> {
@@ -90,9 +80,21 @@ fn item_data(json: &Value, map: &mut ItemMap) -> Result<Arc<ItemData>> {
     };
     let node   = try!(def_id(fields[4].1.unwrap()));
 
+    let mut doc: Vec<_> = Vec::new();
+    for attr in &attrs {
+        if let Attribute::NameValue(ref n, ref v) = *attr {
+            if n == "doc" {
+                try!(doc.push_all(v.as_ref()));
+                try!(doc.push_all(b"\n"));
+            }
+        }
+    }
+    let docs = try!(markup::parse(&doc));
+
     let item = Arc::new(ItemData {
         name: name,
         attrs: attrs,
+        docs: docs,
         inner: inner,
         public: public,
         node: node,
@@ -318,7 +320,7 @@ fn type_resolved_path(fields: &Slice) -> Result<Type> {
         _ => Some(try!(ty_param_bounds(&fields[1]))),
     };
     let node = try!(def_id(&fields[2]));
-    Ok(Type::ResolvedPath(path, typarams, node))
+    Ok(Type::ResolvedPath(path, typarams, node, RefCell::new(None)))
 }
 
 fn ty_param_bounds(json: &Value) -> Result<SVec<TyParamBound>> {
@@ -424,7 +426,7 @@ fn type_bare_function(fields: &Slice) -> Result<Type> {
         abi: try!(abi.clone()),
     };
 
-    Ok(Type::BareFunction(box_try!(Box::new(bare_decl))))
+    Ok(Type::BareFunction(try_box!(bare_decl)))
 }
 
 fn type_tuple(fields: &Slice) -> Result<Type> {
@@ -440,14 +442,14 @@ fn type_tuple(fields: &Slice) -> Result<Type> {
 fn type_slice(fields: &Slice) -> Result<Type> {
     if fields.len() != 1 { error!("slice type with {} fields", fields.len()); }
     let ty = try!(type_(&fields[0]));
-    Ok(Type::Slice(box_try!(Box::new(ty))))
+    Ok(Type::Slice(try_box!(ty)))
 }
 
 fn type_array(fields: &Slice) -> Result<Type> {
     if fields.len() != 2 { error!("array type with {} fields", fields.len()); }
     let ty = try!(type_(&fields[0]));
     let len = try!(collect_string(&fields[1], "array type", "unnamed"));
-    Ok(Type::Array(box_try!(Box::new(ty)), try!(len.clone())))
+    Ok(Type::Array(try_box!(ty), try!(len.clone())))
 }
 
 fn type_bottom(fields: &Slice) -> Result<Type> {
@@ -459,7 +461,7 @@ fn type_pointer(fields: &Slice) -> Result<Type> {
     if fields.len() != 2 { error!("bottom type with {} fields", fields.len()); }
     let mutable = try!(mutability(&fields[0]));
     let ty = try!(type_(&fields[1]));
-    Ok(Type::Pointer(mutable, box_try!(Box::new(ty))))
+    Ok(Type::Pointer(mutable, try_box!(ty)))
 }
 
 fn type_ref(fields: &Slice) -> Result<Type> {
@@ -470,7 +472,7 @@ fn type_ref(fields: &Slice) -> Result<Type> {
     };
     let mutable = try!(mutability(&fields[1]));
     let ty = try!(type_(&fields[2]));
-    Ok(Type::Ref(lifetime, mutable, box_try!(Box::new(ty))))
+    Ok(Type::Ref(lifetime, mutable, try_box!(ty)))
 }
 
 fn type_ufcs_path(fields: &Slice) -> Result<Type> {
@@ -479,7 +481,7 @@ fn type_ufcs_path(fields: &Slice) -> Result<Type> {
     let self_ty = try!(type_(&fields[1]));
     let trait_ty = try!(type_(&fields[2]));
     let name = try!(name.clone());
-    Ok(Type::UfcsPath(name, box_try!(Box::new(self_ty)), box_try!(Box::new(trait_ty))))
+    Ok(Type::UfcsPath(name, try_box!(self_ty), try_box!(trait_ty)))
 }
 
 fn type_infer(fields: &Slice) -> Result<Type> {

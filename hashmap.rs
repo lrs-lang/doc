@@ -8,7 +8,7 @@ use lrs::vec::{SVec, Vec};
 use lrs::iter::{Iterator, IntoIterator};
 use lrs::rc::{Arc};
 
-use ast::{ItemData};
+use tree::{ItemData};
 
 const FACTOR: usize = 2;
 
@@ -31,7 +31,7 @@ impl ItemMap {
             buckets: try!(Vec::with_capacity(new_size)),
             count: self.count,
         };
-        for i in 0..new_size {
+        for _ in 0..new_size {
             map.buckets.push(Vec::new());
         }
         for element in &*self {

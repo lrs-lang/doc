@@ -4,9 +4,12 @@
 
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::rc::{Arc};
+use lrs::cell::{RefCell};
 use lrs::vec::{SVec};
 use lrs::string::{SByteString};
 use lrs::bx::{Box};
+
+use markup::{Document};
 
 pub struct Crate {
     pub item: Arc<ItemData>,
@@ -15,6 +18,7 @@ pub struct Crate {
 pub struct ItemData {
     pub name: Option<SByteString>,
     pub attrs: SVec<Attribute>,
+    pub docs: Document,
     pub inner: Item,
     pub public: bool,
     pub node: u64,
@@ -94,7 +98,7 @@ pub struct Path {
 }
 
 pub enum Type {
-    ResolvedPath(Path, Option<SVec<TyParamBound>>, u64),
+    ResolvedPath(Path, Option<SVec<TyParamBound>>, u64, RefCell<Option<Arc<ItemData>>>),
     Generic(SByteString),
     Primitive(Primitive),
     BareFunction(Box<BareFunctionDecl>),
