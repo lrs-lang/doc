@@ -149,6 +149,22 @@ pub fn block<W: Write>(mut w: &mut W, block: &Block) -> Result {
             try!(text_block(w, t));
             try!(w.write_all(b"</p>"));
         },
+        Block::Table(ref t) => {
+            try!(w.write_all(b"<table>"));
+            for row in t {
+                try!(w.write_all(b"<tr>"));
+                for col in &row.cols {
+                    try!(w.write_all(b"<td>"));
+                    match *col {
+                        TableCol::Simple(ref t) => try!(text_block(w, t)),
+                        TableCol::Complex(ref d) => try!(block_data(w, d)),
+                    }
+                    try!(w.write_all(b"</td>"));
+                }
+                try!(w.write_all(b"</tr>"));
+            }
+            try!(w.write_all(b"</table>"));
+        },
     };
     Ok(())
 }

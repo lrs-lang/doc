@@ -107,12 +107,14 @@ fn module<'a>(item: &'a ItemData, parts: &mut SVec<&'a [u8]>) -> Result {
 
     try!(file.write_all(b"\
         <h2>Modules</h2>\
-        <table>\
-            <tbody>\
+        <table class=\"modules\">\
+            <thead>\
                 <tr>\
                     <th>Name</th>\
                     <th>Description</th>\
                 </tr>\
+            </thead>\
+            <tbody>\
                 "));
 
     for &(item, module) in &sub_mods {

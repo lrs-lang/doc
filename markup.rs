@@ -18,6 +18,12 @@
 //! ListEl        <- SimpleListEl / BlockListEl
 //! ListBlock     <- ListEl+
 //!
+//! TableDelim    <- '|===' $
+//! ColumnText    <- (!'|' ('\\\\' / '\\|' / .))*
+//! SimpleRow     <- ('|' ColumnText)+ $
+//! Row           <- (SimpleRow / (!$ Block))* $
+//! TableBlock    <- TableDelim ($* !TableDelim Row)* $* TableDelim?
+//!
 //! VarName       <- [a-zA-Z_]+
 //! VarDef        <- ':' VarName ': ' .* $
 //!
@@ -31,8 +37,8 @@
 //! GroupedBlock  <- GroupStart ($* !GroupEnd Block)* $* GroupEnd?
 //!
 //! Attribute     <- '[' .* ']' $
-//! Block         <- Attribute* (VarDef / GroupedBlock / CodeBlock / ListBlock /
-//!                              TextBlock)
+//! Block         <- Attribute* (VarDef / GroupedBlock / CodeBlock / TableBlock /
+//!                              ListBlock / TextBlock)
 //!
 //! SectionHeader <- '='+ ' ' .* $
 //!
@@ -49,6 +55,7 @@
 //! SubstStart     <- '{'
 //! SubstEnd       <- '}'
 //! LinkEnd        <- ']'
+//! ColumnSep      <- '|'
 //!
 //! EscapeSequence <- '\\' ('\\' / RawDelim / BoldDelim / SubstStart / LinkEnd /
 //!                         LinkStart)
@@ -99,10 +106,20 @@ pub enum Block {
     Grouped(SVec<BlockData>),
     Code(SByteString),
     List(SVec<ListEl>),
+    Table(SVec<TableRow>),
     Text(TextBlock),
 }
 
 pub enum ListEl {
+    Simple(TextBlock),
+    Complex(BlockData),
+}
+
+pub struct TableRow {
+    pub cols: SVec<TableCol>,
+}
+
+pub enum TableCol {
     Simple(TextBlock),
     Complex(BlockData),
 }
@@ -237,6 +254,7 @@ impl<R: BufRead> DocParser<R> {
            try!(self.var_def())
         || try!(self.grouped_block())
         || try!(self.code_block())
+        || try!(self.table_block())
         || try!(self.list_block())
         || try!(self.text_block())
         ;
@@ -391,6 +409,89 @@ impl<R: BufRead> DocParser<R> {
         let block = BlockData {
             attributes: Vec::new(),
             inner: Block::Code(ByteString::from_vec(code)),
+        };
+
+        try!(self.parts.reserve(1));
+        self.parts.push(Part::Block(block));
+        Ok(true)
+    }
+
+    /// TableDelim <- '|===' $
+    /// ColumnText <- (!'|' ('\\\\' / '\\|' / .))*
+    /// SimpleRow  <- ('|' ColumnText)+ $
+    /// Row        <- (SimpleRow / (!$ Block))* $
+    /// TableBlock <- TableDelim ($* !TableDelim Row)* $* TableDelim?
+    fn table_block(&mut self) -> Result<bool> {
+        if try!(self.peek_line()) != "|===" {
+            return Ok(false);
+        }
+
+        // Discard TableDelim
+        try!(self.next_line());
+
+        let mut rows = Vec::new();
+
+        'table: loop {
+            try!(self.blank_lines());
+
+            if self.eof || try!(self.peek_line()) == "|===" {
+                break 'table;
+            }
+
+            let mut cols = Vec::new();
+
+            'row: loop {
+                if try!(self.peek_line()) == "" {
+                    break 'row;
+                }
+
+                if try!(self.peek_line())[0] == b'|' {
+                    let line = try!(self.next_line());
+
+                    // simple row
+                    let mut col_start = 1;
+                    let mut i = 1;
+                    while i < line.len() {
+                        // pass escaped \\ and | to the next level
+                        if i + 1 < line.len() && line[i] == b'\\' {
+                            match line[i+1] {
+                                b'\\' | b'|' => { i += 2; continue; }
+                                _ => { },
+                            }
+                        }
+                        if line[i] == b'|' {
+                            let text = try!(TextParser::all_in_one(&line[col_start..i],
+                                                                   &self.vars));
+                            col_start = i + 1;
+                            try!(cols.reserve(1));
+                            cols.push(TableCol::Simple(text));
+                        }
+                        i += 1;
+                    }
+                    // The last column
+                    let text = try!(TextParser::all_in_one(&line[col_start..i],
+                                                           &self.vars));
+                    try!(cols.reserve(1));
+                    cols.push(TableCol::Simple(text));
+                } else {
+                    // block row
+                    try!(self.block());
+                    let block = self.pop_block();
+                    try!(cols.reserve(1));
+                    cols.push(TableCol::Complex(block));
+                }
+            }
+
+            try!(rows.reserve(1));
+            rows.push(TableRow { cols: cols });
+        }
+
+        // Discard trailing TableDelim if any
+        try!(self.next_line());
+
+        let block = BlockData {
+            attributes: Vec::new(),
+            inner: Block::Table(rows),
         };
 
         try!(self.parts.reserve(1));
@@ -605,6 +706,8 @@ impl<'a> TextParser<'a> {
         } else if self.text[1] == b'{' {
             1
         } else if self.text[1] == b']' {
+            1
+        } else if self.text[1] == b'|' {
             1
         } else if self.text[1..].starts_with(b"link:") {
             b"link:".len()
