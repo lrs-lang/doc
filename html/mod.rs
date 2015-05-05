@@ -5,15 +5,22 @@
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::io::{Write};
 use lrs::file::{self, File};
-use lrs::{process};
 use lrs::string::{ByteString, SByteString};
 use lrs::vec::{SVec};
 use lrs::iter::{IteratorExt};
 
 use tree::*;
-use markup::{Document};
 
 mod markup;
+
+mod trait_;
+mod typedef;
+mod enum_;
+mod function;
+mod struct_;
+mod type_;
+mod module;
+mod method;
 
 pub fn create(krate: Crate) -> Result {
     let docs = &krate.item.docs;
@@ -124,521 +131,9 @@ impl Formatter {
         try!(file.write_all(b"</h1>"));
         Ok(())
     }
-
-    fn module(&mut self, module: &Module, docs: &Document) -> Result {
-        let mut file = try!(self.file());
-
-        try!(self.head(&mut file, "Module "));
-        try!(self.h1(&mut file, "Module "));
-
-        try!(markup::short(&mut file, &docs.parts));
-        try!(markup::description(&mut file, &docs.parts));
-
-        try!(self.sub_modules(&mut file, module));
-        try!(self.types(&mut file, module));
-
-        try!(self.foot(&mut file));
-        Ok(())
-    }
-
-    fn sub_modules(&mut self, file: &mut File, module: &Module) -> Result {
-        let mut sub_mods: Vec<_> = Vec::new();
-
-        for item in &module.items {
-            match item.inner {
-                Item::Module(ref m) => sub_mods.push((item, m)),
-                _ => { },
-            }
-        }
-
-        if sub_mods.len() == 0 {
-            return Ok(());
-        }
-
-        sub_mods.sort_by(|&(m1,_), &(m2,_)| m1.name.as_ref().unwrap().as_ref()
-                                    .cmp(m2.name.as_ref().unwrap().as_ref()));
-
-        try!(file.write_all(b"\
-            <h2>Sub-modules</h2>\
-            <table>\
-                <thead>\
-                    <tr>\
-                        <th>Name</th>\
-                        <th>Description</th>\
-                    </tr>\
-                </thead>\
-                <tbody>\
-                    "));
-
-        for &(item, module) in &sub_mods {
-            try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
-            try!(self.module(module, &item.docs));
-
-            try!(file.write_all(b"\
-                <tr>\
-                    <td>\
-                        <a href=\"./\
-                    "));
-            try!(file.write_all(try!(path::path(&self.path)).as_ref()));
-            try!(file.write_all(b"\">"));
-            try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
-            try!(file.write_all(b"\
-                        </a>\
-                    </td>\
-                    <td>\
-                    "));
-            try!(markup::short(file, &item.docs.parts));
-            try!(file.write_all(b"\
-                    </td>\
-                </tr>\
-                "));
-
-            self.path.pop();
-        }
-
-        try!(file.write_all(b"\
-                </tbody>\
-            </table>\
-            "));
-
-        Ok(())
-    }
-
-    fn types(&mut self, file: &mut File, module: &Module) -> Result {
-        let mut types: Vec<_> = Vec::new();
-
-        for item in &module.items {
-            match item.inner {
-                Item::Struct(_)  => types.push((item, "Struct",  "struct_hl")),
-                Item::Enum(_)    => types.push((item, "Enum",    "enum_hl")),
-                Item::Typedef(_) => types.push((item, "Typedef", "typedef_hl")),
-                Item::Trait(_)   => types.push((item, "Trait",   "trait_hl")),
-                _ => { },
-            }
-        }
-
-        if types.len() == 0 {
-            return Ok(());
-        }
-
-        types.sort_by(|&(m1, _, _), &(m2, _, _)| m1.name.as_ref().unwrap().as_ref()
-                                            .cmp(m2.name.as_ref().unwrap().as_ref()));
-
-        try!(file.write_all(b"\
-            <h2>Types</h2>\
-            <table>\
-                <thead>\
-                    <tr>\
-                        <th>Kind</th>\
-                        <th>Name</th>\
-                        <th>Description</th>\
-                    </tr>\
-                </thead>\
-                <tbody>\
-                    "));
-
-        for &(item, kind, class) in &types {
-            try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
-            try!(self.type_(&item, &item.docs));
-
-            try!(file.write_all(b"\
-                <tr>\
-                    <td class=\"\
-                    "));
-            try!(file.write_all(class.as_bytes()));
-            try!(file.write_all(b"\">"));
-            try!(file.write_all(kind.as_bytes()));
-            try!(file.write_all(b"\
-                    </td>
-                    <td>\
-                        <a href=\"./\
-                    "));
-            try!(file.write_all(try!(path::path(&self.path)).as_ref()));
-            try!(file.write_all(b"\">"));
-            try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
-            try!(file.write_all(b"\
-                        </a>\
-                    </td>\
-                    <td>\
-                    "));
-            try!(markup::short(file, &item.docs.parts));
-            try!(file.write_all(b"\
-                    </td>\
-                </tr>\
-                "));
-
-            self.path.pop();
-        }
-
-        try!(file.write_all(b"\
-                </tbody>\
-            </table>\
-            "));
-
-        Ok(())
-    }
-
-    fn type_(&mut self, item: &ItemData, docs: &Document) -> Result {
-        match item.inner {
-            Item::Struct(ref  s) => self.struct_(item, s, docs),
-            Item::Enum(ref    e) => self.enum_(e,   docs),
-            Item::Typedef(ref t) => self.typedef(t, docs),
-            Item::Trait(ref   t) => self.trait_(t,  docs),
-            _ => abort!(),
-        }
-    }
-
-    fn struct_(&mut self, item: &ItemData, strukt: &Struct, docs: &Document) -> Result {
-        let mut file = try!(self.file());
-
-        try!(self.head(&mut file, "Struct "));
-        try!(self.h1(&mut file, "Struct "));
-
-        try!(markup::short(&mut file, &docs.parts));
-
-        try!(self.struct_syntax(&mut file, strukt));
-        try!(self.struct_fields(&mut file, strukt, docs));
-        try!(self.static_methods(&mut file, item));
-
-        try!(markup::remarks(&mut file, &docs.parts));
-        try!(markup::see_also(&mut file, &docs.parts));
-
-        Ok(())
-    }
-
-    fn struct_syntax(&mut self, file: &mut File, strukt: &Struct) -> Result {
-        try!(file.write_all(b"\
-            <h2>Syntax</h2>\
-            <pre>\
-                struct \
-            "));
-        try!(file.write_all(self.path[self.path.len()-1].as_ref()));
-
-        let mut have_where_predicates = strukt.generics.where_predicates.len() > 0;
-        have_where_predicates |= try!(angle_generics(file, &strukt.generics));
-
-        if strukt.struct_type == StructType::Tuple {
-            try!(file.write_all(b"("));
-            let mut first = true;
-            for item in &strukt.fields {
-                if !first {
-                    try!(file.write_all(b", "));
-                }
-                first = false;
-                let field = match item.inner {
-                    Item::StructField(ref f) => f,
-                    _ => errexit!("struct field is not a StructField"),
-                };
-                match *field {
-                    StructField::Hidden => {
-                        try!(file.write_all(b"/* */"));
-                    },
-                    StructField::Typed(ref t) => {
-                        try!(write_raw_type(file, t));
-                    },
-                }
-            }
-            try!(file.write_all(b")"));
-        }
-
-        if have_where_predicates {
-            try!(file.write_all(b"\n"));
-            try!(where_predicates(file, &strukt.generics, "    "));
-        }
-
-        if strukt.struct_type == StructType::Plain {
-            if have_where_predicates {
-                try!(file.write_all(b"\n{\n"));
-            } else {
-                try!(file.write_all(b" {\n"));
-            }
-            let mut have_hidden = false;
-            for item in &strukt.fields {
-                let field = match item.inner {
-                    Item::StructField(ref f) => f,
-                    _ => errexit!("struct field is not a StructField"),
-                };
-                if let StructField::Typed(ref t) = *field {
-                    try!(file.write_all(b"    "));
-                    try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
-                    try!(file.write_all(b": "));
-                    try!(write_raw_type(file, t));
-                    try!(file.write_all(b",\n"));
-                } else {
-                    have_hidden = true;
-                }
-            }
-            if have_hidden {
-                try!(file.write_all(b"    /* private fields */\n"));
-            }
-            try!(file.write_all(b"}"));
-        }
-
-        try!(file.write_all(b"\
-            </pre>\
-            "));
-
-        Ok(())
-    }
-
-    fn struct_fields(&mut self, mut file: &mut File, strukt: &Struct,
-                     docs: &Document) -> Result {
-        let mut have_public_fields = false;
-        for field in &strukt.fields {
-            if let Item::StructField(ref f) = field.inner {
-                if let StructField::Typed(_) = *f {
-                    have_public_fields = true;
-                    break;
-                }
-            }
-        }
-
-        if !have_public_fields {
-            return Ok(());
-        }
-
-        try!(file.write_all(b"\
-            <h2>Fields</h2>\
-            <table>\
-                <thead>\
-                    <tr>\
-                    "));
-        if strukt.struct_type == StructType::Tuple {
-            try!(file.write_all(b"<th>Position</th>"));
-        } else {
-            try!(file.write_all(b"<th>Name</th>"));
-        }
-        try!(file.write_all(b"\
-                        <th>Type</th>\
-                        <th>Description</th>\
-                    </tr>\
-                </thead>\
-                <tbody>\
-                    "));
-
-        for (i, item) in strukt.fields.iter().enumerate() {
-            let field = match item.inner {
-                Item::StructField(ref f) => f,
-                _ => errexit!("struct field is not a StructField"),
-            };
-            let t = match *field {
-                StructField::Typed(ref t) => t,
-                _ => continue,
-            };
-            try!(file.write_all(b"<tr><td>"));
-            if strukt.struct_type == StructType::Tuple {
-                try!(write!(file, "{}", i + 1));
-            } else {
-                try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
-            }
-            try!(file.write_all(b"</td><td><code>"));
-            try!(write_raw_type(file, t));
-            try!(file.write_all(b"</code></td><td>"));
-            if strukt.struct_type == StructType::Tuple {
-                let field: ByteString = format!("{}", i + 1);
-                try!(markup::field_desc(file, &docs.parts, field.as_ref()));
-            } else {
-                try!(markup::all(file, &item.docs.parts));
-            }
-            try!(file.write_all(b"</td></tr>"));
-        }
-
-        try!(file.write_all(b"\
-                </tbody>\
-            </table>\
-            "));
-
-        Ok(())
-    }
-
-    fn static_methods(&mut self, mut file: &mut File, item: &ItemData) -> Result {
-        let impls = item.impls.borrow();
-
-        let mut methods: Vec<_> = Vec::new();
-
-        for impl_ in &*impls {
-            if impl_.trait_.is_none() {
-                for item in &impl_.items {
-                    if let Item::Method(ref method) = item.inner {
-                        if let SelfTy::Static = method.self_ {
-                            try!(methods.reserve(1));
-                            methods.push((impl_, item, method));
-                        }
-                    }
-                }
-            }
-        }
-
-        if methods.len() == 0 {
-            return Ok(());
-        }
-
-        methods.sort_by(|&(_, i1, _), &(_, i2, _)| i1.name.as_ref().unwrap().as_ref()
-                                              .cmp(i2.name.as_ref().unwrap().as_ref()));
-
-        try!(file.write_all(b"\
-            <h2>Static methods</h2>\
-            <table>\
-                <thead>\
-                    <tr>\
-                        <th>Name</th>\
-                        <th>Description</th>\
-                    </tr>\
-                </thead>\
-                <tbody>\
-                    "));
-
-        for &(impl_, item, method) in &methods {
-            try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
-            try!(self.method(impl_, item, method));
-
-            try!(file.write_all(b"\
-                <tr>\
-                    <td>\
-                        <a href=\"./\
-                    "));
-            try!(file.write_all(try!(path::path(&self.path)).as_ref()));
-            try!(file.write_all(b"\">"));
-            try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
-            try!(file.write_all(b"\
-                        </a>\
-                    </td>\
-                    <td>\
-                    "));
-            try!(markup::short(file, &item.docs.parts));
-            try!(file.write_all(b"\
-                    </td>\
-                </tr>\
-                "));
-
-            self.path.pop();
-        }
-
-        try!(file.write_all(b"\
-                </tbody>\
-            </table>\
-            "));
-
-        Ok(())
-    }
-
-    fn method(&mut self, impl_: &Impl, item: &ItemData, method: &Method) -> Result {
-        let mut file = try!(self.file());
-
-        try!(self.head(&mut file, "Method "));
-        try!(self.h1(&mut file, "Method "));
-
-        try!(markup::short(&mut file, &item.docs.parts));
-
-        try!(self.method_syntax(&mut file, impl_, item, method));
-
-        Ok(())
-    }
-
-    fn method_syntax(&mut self, file: &mut File, impl_: &Impl, item: &ItemData,
-                     method: &Method) -> Result {
-        try!(file.write_all(b"\
-            <h2>Syntax</h2>\
-            <pre>\
-                impl\
-            "));
-
-        // impl block
-
-        let mut have_where_predicates = impl_.generics.where_predicates.len() > 0;
-        have_where_predicates |= try!(angle_generics(file, &impl_.generics));
-
-        try!(file.write_all(b" "));
-        try!(write_raw_type(file, &impl_.for_));
-
-        if have_where_predicates {
-            try!(file.write_all(b"\n"));
-            try!(where_predicates(file, &impl_.generics, "    "));
-            try!(file.write_all(b"\n{\n"));
-        } else {
-            try!(file.write_all(b" {\n"));
-        }
-
-        // fn block
-
-        try!(file.write_all(b"    "));
-        if method.unsaf {
-            try!(file.write_all(b"unsafe "));
-        }
-        try!(file.write_all(b"fn "));
-        try!(file.write_all(self.path.last().as_ref().unwrap().as_ref()));
-
-        have_where_predicates = method.generics.where_predicates.len() > 0;
-        have_where_predicates |= try!(angle_generics(file, &method.generics));
-
-        try!(file.write_all(b"("));
-
-        let mut first = true;
-        for arg in &method.decl.inputs {
-            if !first {
-                try!(file.write_all(b", "));
-            }
-            first = false;
-            try!(file.write_all(arg.name.as_ref()));
-            try!(file.write_all(b": "));
-            try!(write_raw_type(file, &arg.type_));
-        }
-
-        try!(file.write_all(b")"));
-
-        match method.decl.output {
-            FuncRetTy::NoReturn => {
-                try!(file.write_all(b" -> !"));
-            },
-            FuncRetTy::Return(ref t) => {
-                try!(file.write_all(b" -> "));
-                try!(write_raw_type(file, t));
-            },
-            FuncRetTy::Unit => { },
-        }
-
-        if have_where_predicates {
-            try!(file.write_all(b"\n"));
-            try!(where_predicates(file, &method.generics, "        "));
-        }
-
-        try!(file.write_all(b"\
-                \n}\
-            </pre>\
-            "));
-
-        Ok(())
-    }
-
-    fn enum_(&mut self, _: &Enum, _: &Document) -> Result {
-        let mut file = try!(self.file());
-
-        try!(self.head(&mut file, "Enum "));
-        try!(self.h1(&mut file, "Enum "));
-        Ok(())
-    }
-
-    fn typedef(&mut self, _: &Typedef, _: &Document) -> Result {
-        let mut file = try!(self.file());
-
-        try!(self.head(&mut file, "Typedef "));
-        try!(self.h1(&mut file, "Typedef "));
-        Ok(())
-    }
-
-    fn trait_(&mut self, _: &Trait, _: &Document) -> Result {
-        let mut file = try!(self.file());
-
-        try!(self.head(&mut file, "Trait "));
-        try!(self.h1(&mut file, "Trait "));
-        Ok(())
-    }
 }
 
-fn write_ty_param_bounds(file: &mut File, bounds: &[TyParamBound]) -> Result {
+fn write_ty_param_bounds<W: Write>(file: &mut W, bounds: &[TyParamBound]) -> Result {
     let mut first = true;
     for bound in bounds {
         if !first {
@@ -650,7 +145,7 @@ fn write_ty_param_bounds(file: &mut File, bounds: &[TyParamBound]) -> Result {
     Ok(())
 }
 
-fn write_ty_param_bound(file: &mut File, bound: &TyParamBound) -> Result {
+fn write_ty_param_bound<W: Write>(file: &mut W, bound: &TyParamBound) -> Result {
     match *bound {
         TyParamBound::Lifetime(ref l) => {
             try!(file.write_all(l.as_ref()));
@@ -669,8 +164,8 @@ fn write_ty_param_bound(file: &mut File, bound: &TyParamBound) -> Result {
     Ok(())
 }
 
-fn write_angle_params(file: &mut File, lts: &[SByteString], types: &[Type],
-                      bindings: &[TypeBinding]) -> Result {
+fn write_angle_params<W: Write>(file: &mut W, lts: &[SByteString], types: &[Type],
+                                bindings: &[TypeBinding]) -> Result {
     let mut first = true;
     for lt in lts {
         if !first {
@@ -698,7 +193,7 @@ fn write_angle_params(file: &mut File, lts: &[SByteString], types: &[Type],
     Ok(())
 }
 
-fn write_raw_type(file: &mut File, t: &Type) -> Result {
+fn write_raw_type<W: Write>(file: &mut W, t: &Type) -> Result {
     match *t {
         Type::ResolvedPath(ref p) => {
             let mut first = !p.path.global;
@@ -838,6 +333,79 @@ fn write_raw_type(file: &mut File, t: &Type) -> Result {
     Ok(())
 }
 
+fn fn_in_out<W: Write>(dst: &mut W, slf: &SelfTy, decl: &FnDecl) -> Result {
+    try!(dst.write_all(b"("));
+
+    let have_slf = match *slf {
+        SelfTy::Static => false,
+        SelfTy::Value => {
+            try!(dst.write_all(b"self"));
+            true
+        },
+        SelfTy::Borrowed(ref lt, mutable) => {
+            try!(dst.write_all(b"&"));
+            if let Some(ref s) = *lt {
+                try!(dst.write_all(s.as_ref()));
+                try!(dst.write_all(b" "));
+            }
+            if mutable {
+                try!(dst.write_all(b"mut "));
+            }
+            try!(dst.write_all(b"self"));
+            true
+        },
+        SelfTy::Explicit(ref t) => {
+            try!(dst.write(b"self: "));
+            try!(write_raw_type(dst, t));
+            true
+        },
+    };
+
+    if have_slf && decl.inputs.len() > 0 {
+        try!(dst.write_all(b", "));
+    }
+
+    let mut first = !have_slf;
+    for arg in &decl.inputs {
+        if !first {
+            try!(dst.write_all(b", "));
+        }
+        first = false;
+        try!(dst.write_all(arg.name.as_ref()));
+        try!(dst.write_all(b": "));
+        try!(write_raw_type(dst, &arg.type_));
+    }
+
+    try!(dst.write_all(b")"));
+
+    match decl.output {
+        FuncRetTy::NoReturn => {
+            try!(dst.write_all(b" -> !"));
+        },
+        FuncRetTy::Return(ref t) => {
+            try!(dst.write_all(b" -> "));
+            try!(write_raw_type(dst, t));
+        },
+        FuncRetTy::Unit => { },
+    }
+
+    Ok(())
+}
+
+fn write_abi<W: Write>(dst: &mut W, abi: &Abi) -> Result<bool> {
+    if let Abi::Rust = *abi {
+        return Ok(false);
+    }
+    match *abi {
+        Abi::Rust => 0,
+        Abi::C => try!(dst.write_all(b"extern")),
+        Abi::System => try!(dst.write_all(b"extern \"system\"")),
+        Abi::RustIntrinsic => try!(dst.write_all(b"extern \"rust-intrinsic\"")),
+        Abi::RustCall => try!(dst.write_all(b"extern \"rust-call\"")),
+    };
+    Ok(true)
+}
+
 fn write_full_path<W: Write>(dst: &mut W, dstitem: &ItemData) -> Result {
     if let Some(ref parent) = *dstitem.parent.borrow() {
         try!(write_full_path(dst, parent));
@@ -851,7 +419,7 @@ fn write_full_path<W: Write>(dst: &mut W, dstitem: &ItemData) -> Result {
     Ok(())
 }
 
-fn angle_generics(file: &mut File,  generics: &Generics) -> Result<bool> {
+fn angle_generics<W: Write>(file: &mut W,  generics: &Generics) -> Result<bool> {
     if generics.lifetimes.len() + generics.type_params.len() == 0 {
         return Ok(false);
     }
@@ -884,7 +452,7 @@ fn angle_generics(file: &mut File,  generics: &Generics) -> Result<bool> {
     Ok(have_where_predicates)
 }
 
-fn where_predicates(file: &mut File, generics: &Generics, prefix: &str) -> Result {
+fn where_predicates<W: Write>(file: &mut W, generics: &Generics, prefix: &str) -> Result {
     let mut first = true;
     for t in &generics.type_params {
         if t.bounds.len() == 0 {

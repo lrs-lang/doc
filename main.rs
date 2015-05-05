@@ -12,7 +12,6 @@
 mod core { pub use lrs::core::*; }
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 
-use lrs::{process};
 use lrs::file::{File};
 
 #[macro_use] mod macros;
@@ -27,16 +26,9 @@ mod passes;
 fn main() {
     let mut vec: Vec<_> = Vec::new();
     let file = tryerr!(File::open_read("doc.json"), "Could not open doc.json");
-    // tryerr!(vec.read_to_eof(STDIN), "Could not read STDIN");
     tryerr!(vec.read_to_eof(file), "Could not read doc.json");
     let json = tryerr!(json::parse(&vec), "Could not parse JSON");
     let krate = tryerr!(parse::parse(&json), "Could not parse AST");
     passes::run(&krate);
-
     tryerr!(html::create(krate), "Could not create html");
-    // if let Item::Module(ref m) = ast.item.inner {
-    //     for item in &m.items {
-    //         println!("{:?}", item.name);
-    //     }
-    // }
 }

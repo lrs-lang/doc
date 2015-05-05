@@ -7,7 +7,7 @@ macro_rules! errexit {
     ($fmt:expr) => { errexit!(concat!($fmt, "{}"), "") };
     ($fmt:expr, $($arg:tt)*) => {{
         errln!($fmt, $($arg)*);
-        process::exit(1);
+        ::lrs::process::exit(1);
     }};
 }
 
