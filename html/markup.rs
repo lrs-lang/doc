@@ -4,15 +4,51 @@
 
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::io::{Write};
+use lrs::string::{AsByteStr, ByteString};
+use lrs::util::{memchr};
+use lrs::bx::{Box};
 
 use markup::*;
+
+pub fn all<W: Write>(w: &mut W, parts: &[Part]) -> Result {
+    for part in parts {
+        match *part {
+            Part::SectionHeader(n, ref text) => try!(section_header(w, n, text)),
+            Part::Block(ref data) => try!(block_data(w, data, false)),
+        }
+    }
+    Ok(())
+}
 
 pub fn short<W: Write>(w: &mut W, parts: &[Part]) -> Result {
     for part in parts {
         match *part {
             Part::SectionHeader(1, _) => break,
             Part::SectionHeader(n, ref text) => try!(section_header(w, n, text)),
-            Part::Block(ref data) => try!(block_data(w, data)),
+            Part::Block(ref data) => try!(block_data(w, data, false)),
+        }
+    }
+    Ok(())
+}
+
+pub fn field_desc<W: Write>(w: &mut W, parts: &[Part], name: &[u8]) -> Result {
+    for part in parts {
+        match *part {
+            Part::SectionHeader(1, _) => break,
+            Part::SectionHeader(_, _) => { },
+            Part::Block(ref data) => {
+                for attr in &data.attributes {
+                    println!("{}", attr.name);
+                    if attr.name.trim() == "field" {
+                        if let Some(ref a) = attr.args {
+                            if a.trim() == name.as_byte_str() {
+                                try!(block_data(w, data, true));
+                                return Ok(());
+                            }
+                        }
+                    }
+                }
+            },
         }
     }
     Ok(())
@@ -26,9 +62,21 @@ fn text_block_is(block: &TextBlock, val: &str) -> bool {
 }
 
 pub fn description<W: Write>(w: &mut W, parts: &[Part]) -> Result {
+    section(w, parts, "Description")
+}
+
+pub fn remarks<W: Write>(w: &mut W, parts: &[Part]) -> Result {
+    section(w, parts, "Remarks")
+}
+
+pub fn see_also<W: Write>(w: &mut W, parts: &[Part]) -> Result {
+    section(w, parts, "See also")
+}
+
+pub fn section<W: Write>(w: &mut W, parts: &[Part], name: &str) -> Result {
     let pos = parts.find(|p| {
         match *p {
-            Part::SectionHeader(1, ref n) if text_block_is(n, "Description") => true,
+            Part::SectionHeader(1, ref n) if text_block_is(n, name) => true,
             _ => false,
         }
     });
@@ -44,7 +92,7 @@ pub fn description<W: Write>(w: &mut W, parts: &[Part]) -> Result {
         match *part {
             Part::SectionHeader(1, _) => break,
             Part::SectionHeader(n, ref text) => try!(section_header(w, n, text)),
-            Part::Block(ref data) => try!(block_data(w, data)),
+            Part::Block(ref data) => try!(block_data(w, data, false)),
         }
     }
     Ok(())
@@ -87,15 +135,35 @@ pub fn text<W: Write>(mut w: &mut W, txt: &Text) -> Result {
                 try!(text_block(w, b));
             }
         },
-        Text::Link(ref link, ref txt) => {
-            try!(write!(w, "<a href=\"{}\">", link));
-            match *txt {
-                Some(ref txt) => try!(text_block(w, txt)),
-                _ => try!(raw(w, link.as_ref())),
-            }
-            try!(write!(w, "</a>"));
-        },
+        Text::Link(ref l, ref txt) => try!(link(w, l, txt)),
     }
+    Ok(())
+}
+
+pub fn link<W: Write>(mut w: &mut W, link: &ByteString,
+                      txt: &Option<Box<TextBlock>>) -> Result {
+    if let Some(ref txt) = *txt {
+        try!(write!(w, "<a href=\"{}\">", link));
+        try!(text_block(w, txt));
+        try!(write!(w, "</a>"));
+        return Ok(());
+    }
+    
+    if link.as_ref().starts_with(b"man:") {
+        if let Some(p) = memchr(link.as_ref(), b'(') {
+            try!(write!(w,
+                "<a href=\"http://man7.org/linux/man-pages/man{}/{}.{}.html\">{}</a>",
+                link[p+1..link.len()-1], link[4..p], link[p+1..link.len()-1], link[4..]));
+            return Ok(());
+        }
+    }
+
+    if link.as_ref().starts_with(b"lrs") {
+        try!(write!(w, "<a href=\"./{}.html\">{}</a>", link, link));
+        return Ok(());
+    }
+
+    try!(write!(w, "<a href=\"{}\">{}</a>", link, link));
     Ok(())
 }
 
@@ -111,20 +179,23 @@ pub fn raw<W: Write>(mut w: &mut W, txt: &[u8]) -> Result {
     Ok(())
 }
 
-pub fn block_data<W: Write>(mut w: &mut W, block_data: &BlockData) -> Result {
-    for attr in &block_data.attributes {
-        if &attr.name == "hidden" {
-            return Ok(());
+pub fn block_data<W: Write>(mut w: &mut W, data: &BlockData,
+                            show_hidden: bool) -> Result {
+    if !show_hidden {
+        for attr in &data.attributes {
+            let name = attr.name.trim();
+            for &aname in &["hidden", "arg", "field"][..] {
+                if name == aname {
+                    return Ok(());
+                }
+            }
         }
     }
-    block(w, &block_data.inner)
-}
 
-pub fn block<W: Write>(mut w: &mut W, block: &Block) -> Result {
-    match *block {
+    match data.inner {
         Block::Grouped(ref blocks) => {
             for data in blocks {
-                try!(block_data(w, data));
+                try!(block_data(w, data, false));
             }
         },
         Block::Code(ref c) => {
@@ -135,12 +206,16 @@ pub fn block<W: Write>(mut w: &mut W, block: &Block) -> Result {
         Block::List(ref l) => {
             try!(w.write_all(b"<ul>"));
             for el in l {
-                try!(w.write_all(b"<li><p>"));
+                try!(w.write_all(b"<li>"));
                 match *el {
-                    ListEl::Simple(ref b) => try!(text_block(w, b)),
-                    ListEl::Complex(ref d) => try!(block_data(w, d)),
+                    ListEl::Simple(ref b) => {
+                        try!(w.write_all(b"<p>"));
+                        try!(text_block(w, b));
+                        try!(w.write_all(b"</p>"));
+                    },
+                    ListEl::Complex(ref d) => try!(block_data(w, d, false)),
                 }
-                try!(w.write_all(b"</p></li>"));
+                try!(w.write_all(b"</li>"));
             }
             try!(w.write_all(b"</ul>"));
         },
@@ -157,7 +232,7 @@ pub fn block<W: Write>(mut w: &mut W, block: &Block) -> Result {
                     try!(w.write_all(b"<td>"));
                     match *col {
                         TableCol::Simple(ref t) => try!(text_block(w, t)),
-                        TableCol::Complex(ref d) => try!(block_data(w, d)),
+                        TableCol::Complex(ref d) => try!(block_data(w, d, false)),
                     }
                     try!(w.write_all(b"</td>"));
                 }
@@ -166,8 +241,6 @@ pub fn block<W: Write>(mut w: &mut W, block: &Block) -> Result {
             try!(w.write_all(b"</table>"));
         },
     };
+
     Ok(())
 }
-
-//pub fn code<W: Write>(mut w: &mut W, c: &[u8]) -> Result {
-//}

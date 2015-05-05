@@ -8,12 +8,16 @@ use lrs::vec::{SVec, Vec};
 use lrs::iter::{Iterator, IntoIterator};
 use lrs::rc::{Arc};
 
-use tree::{ItemData};
+use tree::{ItemData, DefId};
 
 const FACTOR: usize = 2;
 
+fn hash(d: DefId) -> u64 {
+    d.node << 32 | d.krate
+}
+
 pub struct ItemMap {
-    buckets: SVec<SVec<(u64, Arc<ItemData>)>>,
+    buckets: SVec<SVec<(DefId, Arc<ItemData>)>>,
     count: usize,
 }
 
@@ -35,27 +39,37 @@ impl ItemMap {
             map.buckets.push(Vec::new());
         }
         for element in &*self {
-            let hash = (element.0 % new_size as u64) as usize;
-            try!(map.buckets[hash].reserve(1));
-            map.buckets[hash].push((element.0, element.1.new_ref()));
+            let bucket = (hash(element.0) % new_size as u64) as usize;
+            try!(map.buckets[bucket].reserve(1));
+            map.buckets[bucket].push((element.0, element.1.new_ref()));
         }
         mem::replace(self, map);
         Ok(())
     }
 
-    pub fn add(&mut self, id: u64, item: Arc<ItemData>) -> Result {
+    pub fn add(&mut self, id: DefId, item: Arc<ItemData>) -> Result {
         if self.count >= FACTOR * self.buckets.len() {
             try!(self.resize());
         }
-        let hash = (id % self.buckets.len() as u64) as usize;
-        try!(self.buckets[hash].reserve(1));
-        self.buckets[hash].push((id, item));
+        let bucket = (hash(id) % self.buckets.len() as u64) as usize;
+        try!(self.buckets[bucket].reserve(1));
+        self.buckets[bucket].push((id, item));
         Ok(())
+    }
+
+    pub fn find(&self, id: DefId) -> Option<Arc<ItemData>> {
+        let bucket = (hash(id) % self.buckets.len() as u64) as usize;
+        for &(bid, ref item) in &self.buckets[bucket] {
+            if bid == id {
+                return Some(item.new_ref());
+            }
+        }
+        None
     }
 }
 
 impl<'a> IntoIterator for &'a ItemMap {
-    type Item = (u64, &'a Arc<ItemData>);
+    type Item = (DefId, &'a Arc<ItemData>);
     type IntoIter = ItemIter<'a>;
     fn into_iter(self) -> ItemIter<'a> {
         ItemIter { items: self, bucket: 0, element: 0, }
@@ -69,8 +83,8 @@ pub struct ItemIter<'a> {
 }
 
 impl<'a> Iterator for ItemIter<'a> {
-    type Item = (u64, &'a Arc<ItemData>);
-    fn next(&mut self) -> Option<(u64, &'a Arc<ItemData>)> {
+    type Item = (DefId, &'a Arc<ItemData>);
+    fn next(&mut self) -> Option<(DefId, &'a Arc<ItemData>)> {
         if self.bucket >= self.items.buckets.len() {
             return None;
         }

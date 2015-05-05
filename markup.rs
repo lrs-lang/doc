@@ -13,7 +13,7 @@
 //!
 //! $             <- '\n'
 //!
-//! SimpleListEl  <- '* ' .* $
+//! SimpleListEl  <- '* ' .* $ ('  ' .* $)*
 //! BlockListEl   <- '**' $ Block
 //! ListEl        <- SimpleListEl / BlockListEl
 //! ListBlock     <- ListEl+
@@ -24,25 +24,25 @@
 //! Row           <- (SimpleRow / (!$ Block))* $
 //! TableBlock    <- TableDelim ($* !TableDelim Row)* $* TableDelim?
 //!
-//! VarName       <- [a-zA-Z_]+
-//! VarDef        <- ':' VarName ': ' .* $
-//!
 //! TextBlock     <- (.+ $)* $?
 //!
 //! CodeDelim     <- '----' $
-//! CodeBlock     <- CodeDelim CodeLine* CodeDelim?
+//! CodeBlock     <- CodeDelim (!CodeDelim .* $)* CodeDelim?
 //!
 //! GroupStart    <- '{' $ 
 //! GroupEnd      <- '}' $
 //! GroupedBlock  <- GroupStart ($* !GroupEnd Block)* $* GroupEnd?
 //!
 //! Attribute     <- '[' .* ']' $
-//! Block         <- Attribute* (VarDef / GroupedBlock / CodeBlock / TableBlock /
-//!                              ListBlock / TextBlock)
+//! Block         <- Attribute* (GroupedBlock / CodeBlock / TableBlock / ListBlock /
+//!                              TextBlock)
 //!
 //! SectionHeader <- '='+ ' ' .* $
 //!
-//! Document      <- ($* (SectionHeader / Block))*
+//! VarName       <- [a-zA-Z_]+
+//! VarDef        <- ':' VarName ': ' .* $
+//!
+//! Document      <- ($* (SectionHeader / VarDef / Block))*
 //!
 //! =====================================================================================
 //!
@@ -210,7 +210,9 @@ impl<R: BufRead> DocParser<R> {
                 break;
             }
 
-            try!(self.section_header()) || try!(self.block());
+               try!(self.section_header())
+            || try!(self.var_def())
+            || try!(self.block());
         }
 
         Ok(())
@@ -247,12 +249,38 @@ impl<R: BufRead> DocParser<R> {
         Ok(true)
     }
 
-    /// Block <- Attribute* (VarDef / GroupedBlock / CodeBlock / ListBlock / TextBlock)
+    /// VarName <- [a-zA-Z_]+
+    /// VarDef  <- ':' VarName ': ' .* $
+    fn var_def(&mut self) -> Result<bool> {
+        let end = {
+            let line = try!(self.peek_line());
+            if line.len() < 3 || line[0] != b':' { return Ok(false); }
+            let mut i = 1;
+            while i < line.len() {
+                match line[i] {
+                    b'a'...b'z' | b'A'...b'Z' | b'_' => { },
+                    b':' => break,
+                    _ => return Ok(false),
+                }
+                i += 1;
+            }
+            if i + 1 >= line.len() || line[i+1] != b' ' { return Ok(false); }
+            i
+        };
+
+        let line = try!(self.next_line());
+        let name = try!(line[1..end].to_owned());
+        let val = try!(line[end+2..].to_owned());
+        try!(self.vars.reserve(1));
+        self.vars.push((name, val));
+        Ok(true)
+    }
+
+    /// Block <- Attribute* (GroupedBlock / CodeBlock / ListBlock / TextBlock)
     fn block(&mut self) -> Result<bool> {
         let attributes = try!(self.attributes());
 
-           try!(self.var_def())
-        || try!(self.grouped_block())
+           try!(self.grouped_block())
         || try!(self.code_block())
         || try!(self.table_block())
         || try!(self.list_block())
@@ -293,11 +321,12 @@ impl<R: BufRead> DocParser<R> {
     /// [arg, hurr_durr_im_an_arg]
     /// Description of the hurr durr arg that is not shown in the output.
     fn attribute(&mut self) -> Result<Option<Attribute>> {
-        let line = try!(self.peek_line());
+        let mut line = try!(self.peek_line());
 
         if line.len() == 0 || line[0] != b'[' || line[line.len()-1] != b']' {
             return Ok(None);
         }
+        line = &line[1..line.len()-1];
 
         if let Some(pos) = memchr(line, b',') {
             let name = ByteString::from_vec(try!(line[..pos].to_owned()));
@@ -307,35 +336,6 @@ impl<R: BufRead> DocParser<R> {
             let name = ByteString::from_vec(try!(line.to_owned()));
             Ok(Some(Attribute { name: name, args: None }))
         }
-    }
-
-    /// VarName <- [a-zA-Z_]+
-    /// VarDef  <- ':' VarName ': ' .* $
-    ///
-    /// :link: http://google.com
-    fn var_def(&mut self) -> Result<bool> {
-        let end = {
-            let line = try!(self.peek_line());
-            if line.len() < 3 || line[0] != b':' { return Ok(false); }
-            let mut i = 1;
-            while i < line.len() {
-                match line[i] {
-                    b'a'...b'z' | b'A'...b'Z' | b'_' => { },
-                    b':' => break,
-                    _ => return Ok(false),
-                }
-                i += 1;
-            }
-            if i + 1 >= line.len() || line[i+1] != b' ' { return Ok(false); }
-            i
-        };
-
-        let line = try!(self.next_line());
-        let name = try!(line[1..end].to_owned());
-        let val = try!(line[end+2..].to_owned());
-        try!(self.vars.reserve(1));
-        self.vars.push((name, val));
-        Ok(true)
     }
 
     /// GroupStart   <- '{' $ 
@@ -499,42 +499,34 @@ impl<R: BufRead> DocParser<R> {
         Ok(true)
     }
 
-    /// SimpleListEl <- '* ' .* $
+    /// SimpleListEl <- '* ' .* $ ('  ' .* $)*
     /// BlockListEl  <- '**' $ Block
     /// ListEl       <- SimpleListEl / BlockListEl
     /// ListBlock    <- ListEl+
-    ///
-    /// * A
-    /// * B
-    /// **
-    /// Long sentence
-    /// over multiple lines
-    ///
-    /// **
-    /// ----
-    /// Some code
-    /// ----
-    /// * C
-    ///
-    /// * Start of another list
     fn list_block(&mut self) -> Result<bool> {
         let mut list = Vec::new();
 
         loop {
-            let complex = {
+            let simple = {
                 let line = try!(self.peek_line());
                 if line.len() < 2 { break; }
                 if line == &b"**"[..] {
-                    true
-                } else if &line[..2] == &b"* "[..] {
                     false
+                } else if &line[..2] == &b"* "[..] {
+                    true
                 } else {
                     break;
                 }
             };
             let line = try!(self.next_line());
-            let el = if !complex {
-                let text = try!(TextParser::all_in_one(&line[2..], &self.vars));
+            let el = if simple {
+                let mut buf: Vec<_> = try!(line[2..].to_owned());
+                while try!(self.peek_line()).starts_with(b"  ") {
+                    let line = try!(self.next_line());
+                    try!(buf.push_all(b" "));
+                    try!(buf.push_all(&line[2..]));
+                }
+                let text = try!(TextParser::all_in_one(&buf, &self.vars));
                 ListEl::Simple(text)
             } else {
                 try!(self.block());
@@ -603,7 +595,7 @@ impl<'a> TextParser<'a> {
             let mut did_substitute = false;
 
             let mut i = 0;
-            while i < text.len() {
+            'outer: while i < text.len() {
                 // Pass \\\\ and \\{ without changes.
                 if i+1 < text.len() && text[i] == b'\\' {
                     match text[i+1] {
@@ -634,7 +626,7 @@ impl<'a> TextParser<'a> {
                                 did_substitute = true;
                                 try!(next.push_all(sub));
                                 i = j + 1;
-                                continue;
+                                continue 'outer;
                             }
                         }
                     }
@@ -647,6 +639,7 @@ impl<'a> TextParser<'a> {
             }
 
             mem::swap(&mut text, &mut next);
+            next.truncate(0);
  
             if !did_substitute {
                 break;
@@ -800,6 +793,8 @@ impl<'a> TextParser<'a> {
                     }
                 }
                 if self.text[j] == b']' { break; }
+                try!(link_text_.reserve(1));
+                link_text_.push(self.text[j]);
                 j += 1;
             }
             if j < self.text.len() {

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-//! Parser for the cancerous rustdoc JSON output
+//! Parser for the rustdoc JSON output
 
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::error::{self, InvalidArgument};
@@ -12,9 +12,9 @@ use lrs::bx::{Box};
 use lrs::rc::{Arc};
 use lrs::cell::{RefCell};
 
-use json::{Slice, Value};
+use json::{Value};
+use json::Slice as JSlice;
 use tree::*;
-use hashmap::{ItemMap};
 use markup::{self};
 
 macro_rules! error {
@@ -28,8 +28,6 @@ macro_rules! error {
 pub const SCHEMA: &'static [u8] = b"0.8.3";
 
 pub fn parse(json: &Value) -> Result<Crate> {
-    let mut map = ItemMap::new();
-
     let mut fields = [("schema", None), ("crate", None)];
     try!(collect_object(json, &mut fields, "input"));
 
@@ -39,29 +37,27 @@ pub fn parse(json: &Value) -> Result<Crate> {
                  schema);
     }
 
-    let krate = try!(krate(fields[1].1.unwrap(), &mut map));
-
-    Ok(krate)
+    krate(fields[1].1.unwrap())
 }
 
-fn krate(json: &Value, map: &mut ItemMap) -> Result<Crate> {
+fn krate(json: &Value) -> Result<Crate> {
     let mut fields = [("module", None)];
     try!(collect_object(json, &mut fields, "crate"));
 
-    let module = try!(item_data(fields[0].1.unwrap(), map));
+    let module = try!(item_data(fields[0].1.unwrap()));
     Ok(Crate { item: module })
 }
 
-fn item_datas(json: &Value, map: &mut ItemMap) -> Result<SVec<Arc<ItemData>>> {
+fn item_datas(json: &Value) -> Result<SVec<Arc<ItemData>>> {
     let array = try!(collect_array(json, "?", "items"));
     let mut vec = try!(Vec::with_capacity(array.len()));
     for l in array {
-        vec.push(try!(item_data(l, map)));
+        vec.push(try!(item_data(l)));
     }
     Ok(vec)
 }
 
-fn item_data(json: &Value, map: &mut ItemMap) -> Result<Arc<ItemData>> {
+fn item_data(json: &Value) -> Result<Arc<ItemData>> {
     let mut fields = [("name", None), ("attrs", None), ("inner", None),
                       ("visibility", None), ("def_id", None)];
     try!(collect_object(json, &mut fields, "item"));
@@ -73,7 +69,7 @@ fn item_data(json: &Value, map: &mut ItemMap) -> Result<Arc<ItemData>> {
         _ => None,
     };
     let attrs  = try!(attributes(fields[1].1.unwrap()));
-    let inner  = try!(item(fields[2].1.unwrap(), map));
+    let inner  = try!(item(fields[2].1.unwrap()));
     let public = match *fields[3].1.unwrap() {
         Value::Null => true,
         _ => try!(visibility(fields[3].1.unwrap())),
@@ -98,9 +94,9 @@ fn item_data(json: &Value, map: &mut ItemMap) -> Result<Arc<ItemData>> {
         inner: inner,
         public: public,
         node: node,
+        parent: RefCell::new(None),
+        impls: RefCell::new(Vec::new()),
     }).unwrap();
-
-    map.add(node, item.new_ref());
 
     Ok(item)
 }
@@ -152,31 +148,32 @@ fn visibility(json: &Value) -> Result<bool> {
     }
 }
 
-fn def_id(json: &Value) -> Result<u64> {
-    let mut fields = [("node", None)];
+fn def_id(json: &Value) -> Result<DefId> {
+    let mut fields = [("node", None), ("krate", None)];
     try!(collect_object(json, &mut fields, "def_id"));
-    let n = try!(collect_int(fields[0].1.unwrap(), "def_id", "node"));
-    Ok(n as u64)
+    let node = try!(collect_int(fields[0].1.unwrap(), "DefId", "node"));
+    let krate = try!(collect_int(fields[1].1.unwrap(), "DefId", "krate"));
+    Ok(DefId { node: node as u64, krate: krate as u64 })
 }
 
-fn item(json: &Value, map: &mut ItemMap) -> Result<Item> {
+fn item(json: &Value) -> Result<Item> {
     let (variant, fields) = try!(collect_enum(json, "ItemEnum"));
 
     match variant.as_ref() {
         b"ImportItem"          => item_import(fields),
-        b"StructItem"          => item_struct(fields, map),
-        b"EnumItem"            => item_enum(fields, map),
+        b"StructItem"          => item_struct(fields),
+        b"EnumItem"            => item_enum(fields),
         b"FunctionItem"        => item_func(fields),
-        b"ModuleItem"          => item_module(fields, map),
+        b"ModuleItem"          => item_module(fields),
         b"TypedefItem"         => item_typedef(fields),
         b"StaticItem"          => item_static(fields),
         b"ConstantItem"        => item_constant(fields),
-        b"TraitItem"           => item_trait(fields, map),
-        b"ImplItem"            => item_impl(fields, map),
+        b"TraitItem"           => item_trait(fields),
+        b"ImplItem"            => item_impl(fields),
         b"TyMethodItem"        => item_method_decl(fields),
         b"MethodItem"          => item_method(fields),
         b"StructFieldItem"     => item_struct_field(fields),
-        b"VariantItem"         => item_variant(fields, map),
+        b"VariantItem"         => item_variant(fields),
         b"ForeignFunctionItem" => item_extern_func(fields),
         b"ForeignStaticItem"   => item_extern_static(fields),
         b"MacroItem"           => item_macro(fields),
@@ -187,7 +184,7 @@ fn item(json: &Value, map: &mut ItemMap) -> Result<Item> {
     }
 }
 
-fn item_import(fields: &Slice) -> Result<Item> {
+fn item_import(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("import item with {} fields", fields.len()); }
     let (variant, fields) = try!(collect_enum(&fields[0], "Import"));
     if variant != "GlobImport" { error!("unexpected import variant: {:?}", variant); }
@@ -245,20 +242,24 @@ fn path_params(params: &Value) -> Result<PathParameters> {
         b"AngleBracketed" => {
             if fields.len() != 3 { error!("angle bracketed path params with {} fields",
                                            fields.len()); }
-            let lifetimes = try!(lifetimes(&fields[0]));
-            let types = try!(types(&fields[1]));
-            let bindings = try!(type_bindings(&fields[2]));
-            Ok(PathParameters::AngleBracketed(lifetimes, types, bindings))
+            let abpp = AngleBracketedPathParams {
+                lifetimes: try!(lifetimes(&fields[0])),
+                ty_params: try!(types(&fields[1])),
+                bindings: try!(type_bindings(&fields[2])),
+            };
+            Ok(PathParameters::AngleBracketed(abpp))
         },
         b"Parenthesized" => {
             if fields.len() != 2 { error!("paranthesized path parmas with {} fields",
                                           fields.len()); }
-            let inputs = try!(types(&fields[0]));
-            let output = match fields[1] {
-                Value::Null => None,
-                _ => Some(try!(type_(&fields[1]))),
+            let ppp = ParenthesizedPathParams {
+                args: try!(types(&fields[0])),
+                return_value: match fields[1] {
+                    Value::Null => None,
+                    _ => Some(try!(type_(&fields[1]))),
+                },
             };
-            Ok(PathParameters::Parenthesized(inputs, output))
+            Ok(PathParameters::Parenthesized(ppp))
         },
         _ => {
             error!("unexpected path_params variant: {:?}", variant);
@@ -312,15 +313,18 @@ fn type_(json: &Value) -> Result<Type> {
     }
 }
 
-fn type_resolved_path(fields: &Slice) -> Result<Type> {
+fn type_resolved_path(fields: &JSlice) -> Result<Type> {
     if fields.len() != 3 { error!("resolved path type with {} fields", fields.len()); }
-    let path = try!(path(&fields[0]));
-    let typarams = match fields[1] {
-        Value::Null => None,
-        _ => Some(try!(ty_param_bounds(&fields[1]))),
+    let rp = ResolvedPath {
+        path: try!(path(&fields[0])),
+        params: match fields[1] {
+            Value::Null => None,
+            _ => Some(try!(ty_param_bounds(&fields[1]))),
+        },
+        def_id: try!(def_id(&fields[2])),
+        item: RefCell::new(None),
     };
-    let node = try!(def_id(&fields[2]));
-    Ok(Type::ResolvedPath(path, typarams, node, RefCell::new(None)))
+    Ok(Type::ResolvedPath(rp))
 }
 
 fn ty_param_bounds(json: &Value) -> Result<SVec<TyParamBound>> {
@@ -342,9 +346,11 @@ fn ty_param_bound(json: &Value) -> Result<TyParamBound> {
         },
         b"TraitBound" => {
             if fields.len() != 2 { error!("trait bound with {} fields", fields.len()) }
-            let poly_trait = try!(poly_trait(&fields[0]));
-            let maybe = try!(trait_bound_modifier(&fields[1]));
-            Ok(TyParamBound::Trait(poly_trait, maybe))
+            let ttpb = TraitTyParamBound {
+                trait_: try!(poly_trait(&fields[0])),
+                maybe: try!(trait_bound_modifier(&fields[1])),
+            };
+            Ok(TyParamBound::Trait(ttpb))
         },
         _ => error!("unexpected TyParamBound variant: {:?}", variant),
     }
@@ -367,13 +373,13 @@ fn poly_trait(json: &Value) -> Result<PolyTrait> {
     Ok(PolyTrait { trait_: trait_, lifetimes: lifetimes })
 }
 
-fn type_generic(fields: &Slice) -> Result<Type> {
+fn type_generic(fields: &JSlice) -> Result<Type> {
     if fields.len() != 1 { error!("generic type with {} fields", fields.len()); }
     let s = try!(collect_string(&fields[0], "generic type", "unnamed"));
-    Ok(Type::Generic(try!(s.clone())))
+    Ok(Type::Generic(Generic { name: try!(s.clone()) }))
 }
 
-fn type_primitive(fields: &Slice) -> Result<Type> {
+fn type_primitive(fields: &JSlice) -> Result<Type> {
     if fields.len() != 1 { error!("primitive type with {} fields", fields.len()); }
     let p = try!(primitive(&fields[0]));
     Ok(Type::Primitive(p))
@@ -405,7 +411,7 @@ fn primitive(json: &Value) -> Result<Primitive> {
     }
 }
 
-fn type_bare_function(fields: &Slice) -> Result<Type> {
+fn type_bare_function(fields: &JSlice) -> Result<Type> {
     if fields.len() != 1 { error!("bare function type with {} fields", fields.len()); }
 
     let mut fields_ = [("unsafety", None), ("generics", None), ("decl", None),
@@ -426,45 +432,45 @@ fn type_bare_function(fields: &Slice) -> Result<Type> {
         abi: try!(abi.clone()),
     };
 
-    Ok(Type::BareFunction(try_box!(bare_decl)))
+    Ok(Type::BareFunction(BareFunction { decl: try_box!(bare_decl) }))
 }
 
-fn type_tuple(fields: &Slice) -> Result<Type> {
+fn type_tuple(fields: &JSlice) -> Result<Type> {
     if fields.len() != 1 { error!("tuple type with {} fields", fields.len()); }
     let array = try!(collect_array(&fields[0], "tuple type", "unnamed"));
     let mut vec = try!(Vec::with_capacity(array.len()));
     for field in array {
         vec.push(try!(type_(field)));
     }
-    Ok(Type::Tuple(vec))
+    Ok(Type::Tuple(Tuple { fields: vec }))
 }
 
-fn type_slice(fields: &Slice) -> Result<Type> {
+fn type_slice(fields: &JSlice) -> Result<Type> {
     if fields.len() != 1 { error!("slice type with {} fields", fields.len()); }
     let ty = try!(type_(&fields[0]));
-    Ok(Type::Slice(try_box!(ty)))
+    Ok(Type::Slice(Slice { ty: try_box!(ty) }))
 }
 
-fn type_array(fields: &Slice) -> Result<Type> {
+fn type_array(fields: &JSlice) -> Result<Type> {
     if fields.len() != 2 { error!("array type with {} fields", fields.len()); }
     let ty = try!(type_(&fields[0]));
     let len = try!(collect_string(&fields[1], "array type", "unnamed"));
-    Ok(Type::Array(try_box!(ty), try!(len.clone())))
+    Ok(Type::Array(Array { ty: try_box!(ty), initializer: try!(len.clone()) }))
 }
 
-fn type_bottom(fields: &Slice) -> Result<Type> {
+fn type_bottom(fields: &JSlice) -> Result<Type> {
     if fields.len() != 0 { error!("bottom type with {} fields", fields.len()); }
     Ok(Type::Bottom)
 }
 
-fn type_pointer(fields: &Slice) -> Result<Type> {
+fn type_pointer(fields: &JSlice) -> Result<Type> {
     if fields.len() != 2 { error!("bottom type with {} fields", fields.len()); }
     let mutable = try!(mutability(&fields[0]));
     let ty = try!(type_(&fields[1]));
-    Ok(Type::Pointer(mutable, try_box!(ty)))
+    Ok(Type::Pointer(Pointer { mutable: mutable, ty: try_box!(ty) }))
 }
 
-fn type_ref(fields: &Slice) -> Result<Type> {
+fn type_ref(fields: &JSlice) -> Result<Type> {
     if fields.len() != 3 { error!("ref type with {} fields", fields.len()); }
     let lifetime = match fields[0] {
         Value::Null => None,
@@ -472,27 +478,29 @@ fn type_ref(fields: &Slice) -> Result<Type> {
     };
     let mutable = try!(mutability(&fields[1]));
     let ty = try!(type_(&fields[2]));
-    Ok(Type::Ref(lifetime, mutable, try_box!(ty)))
+    Ok(Type::Ref(Ref { lifetime: lifetime, mutable: mutable, ty: try_box!(ty) }))
 }
 
-fn type_ufcs_path(fields: &Slice) -> Result<Type> {
+fn type_ufcs_path(fields: &JSlice) -> Result<Type> {
     if fields.len() != 3 { error!("ufcs type with {} fields", fields.len()); }
     let name = try!(collect_string(&fields[0], "ufcs type", "name"));
-    let self_ty = try!(type_(&fields[1]));
-    let trait_ty = try!(type_(&fields[2]));
-    let name = try!(name.clone());
-    Ok(Type::UfcsPath(name, try_box!(self_ty), try_box!(trait_ty)))
+    let up = UfcsPath {
+        self_ty: try_box!(try!(type_(&fields[1]))),
+        trait_: try_box!(try!(type_(&fields[2]))),
+        target: try!(name.clone()),
+    };
+    Ok(Type::UfcsPath(up))
 }
 
-fn type_infer(fields: &Slice) -> Result<Type> {
+fn type_infer(fields: &JSlice) -> Result<Type> {
     if fields.len() != 0 { error!("infer type with {} fields", fields.len()); }
     Ok(Type::Infer)
 }
 
-fn type_hklt_bound(fields: &Slice) -> Result<Type> {
+fn type_hklt_bound(fields: &JSlice) -> Result<Type> {
     if fields.len() != 1 { error!("hklt bound type with {} fields", fields.len()); }
     let bounds = try!(ty_param_bounds(&fields[0]));
-    Ok(Type::HkltBound(bounds))
+    Ok(Type::HkltBound(HkltBound { bounds: bounds }))
 }
 
 fn type_bindings(json: &Value) -> Result<SVec<TypeBinding>> {
@@ -513,20 +521,20 @@ fn type_binding(json: &Value) -> Result<TypeBinding> {
     Ok(TypeBinding { name: name, ty: ty })
 }
 
-fn item_struct(fields: &Slice, map: &mut ItemMap) -> Result<Item> {
+fn item_struct(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("struct item with {} fields", fields.len()); }
-    let struct_ = try!(struct_(&fields[0], map));
+    let struct_ = try!(struct_(&fields[0]));
     Ok(Item::Struct(struct_))
 }
 
-fn struct_(json: &Value, map: &mut ItemMap) -> Result<Struct> {
+fn struct_(json: &Value) -> Result<Struct> {
     let mut fields = [("struct_type", None), ("generics", None), ("fields", None),
                       ("fields_stripped", None)];
     try!(collect_object(json, &mut fields, "Struct"));
     
     let struct_type = try!(struct_type(&fields[0].1.unwrap()));
     let generics = try!(generics(&fields[1].1.unwrap()));
-    let fields_ = try!(item_datas(&fields[2].1.unwrap(), map));
+    let fields_ = try!(item_datas(&fields[2].1.unwrap()));
     let stripped = try!(collect_bool(&fields[3].1.unwrap(), "Struct", "fields_stripped"));
     Ok(Struct { 
         struct_type: struct_type,
@@ -536,16 +544,16 @@ fn struct_(json: &Value, map: &mut ItemMap) -> Result<Struct> {
     })
 }
 
-fn item_enum(fields: &Slice, map: &mut ItemMap) -> Result<Item> {
+fn item_enum(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("enum item with {} fields", fields.len()); }
-    let enum_ = try!(enum_(&fields[0], map));
+    let enum_ = try!(enum_(&fields[0]));
     Ok(Item::Enum(enum_))
 }
 
-fn enum_(json: &Value, map: &mut ItemMap) -> Result<Enum> {
+fn enum_(json: &Value) -> Result<Enum> {
     let mut fields = [("variants", None), ("generics", None)];
     try!(collect_object(json, &mut fields, "Enum"));
-    let variants = try!(item_datas(fields[0].1.unwrap(), map));
+    let variants = try!(item_datas(fields[0].1.unwrap()));
     let generics = try!(generics(&fields[1].1.unwrap()));
     Ok(Enum {
         variants: variants,
@@ -553,7 +561,7 @@ fn enum_(json: &Value, map: &mut ItemMap) -> Result<Enum> {
     })
 }
 
-fn item_func(fields: &Slice) -> Result<Item> {
+fn item_func(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("func item with {} fields", fields.len()); }
     let func = try!(func(&fields[0]));
     Ok(Item::Func(func))
@@ -576,20 +584,20 @@ fn func(json: &Value) -> Result<Func> {
     })
 }
 
-fn item_module(fields: &Slice, map: &mut ItemMap) -> Result<Item> {
+fn item_module(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("module item with {} fields", fields.len()); }
-    let module = try!(module(&fields[0], map));
+    let module = try!(module(&fields[0]));
     Ok(Item::Module(module))
 }
 
-fn module(json: &Value, map: &mut ItemMap) -> Result<Module> {
+fn module(json: &Value) -> Result<Module> {
     let mut fields = [("items", None)];
     try!(collect_object(json, &mut fields, "Module"));
-    let items = try!(item_datas(&fields[0].1.unwrap(), map));
+    let items = try!(item_datas(&fields[0].1.unwrap()));
     Ok(Module { items: items })
 }
 
-fn item_typedef(fields: &Slice) -> Result<Item> {
+fn item_typedef(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("typedef item with {} fields", fields.len()); }
     let typedef = try!(typedef(&fields[0]));
     Ok(Item::Typedef(typedef))
@@ -603,7 +611,7 @@ fn typedef(json: &Value) -> Result<Typedef> {
     Ok(Typedef { type_: type_, generics: generics })
 }
 
-fn item_static(fields: &Slice) -> Result<Item> {
+fn item_static(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("static item with {} fields", fields.len()); }
     let static_ = try!(static_(&fields[0]));
     Ok(Item::Static(static_))
@@ -619,7 +627,7 @@ fn static_(json: &Value) -> Result<Static> {
     Ok(Static { type_: type_, mutable: mutable, expr: expr })
 }
 
-fn item_constant(fields: &Slice) -> Result<Item> {
+fn item_constant(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("constant item with {} fields", fields.len()); }
     let constant = try!(constant(&fields[0]));
     Ok(Item::Constant(constant))
@@ -634,18 +642,18 @@ fn constant(json: &Value) -> Result<Constant> {
     Ok(Constant { type_: type_, expr: expr })
 }
 
-fn item_trait(fields: &Slice, map: &mut ItemMap) -> Result<Item> {
+fn item_trait(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("trait item with {} fields", fields.len()); }
-    let trait_ = try!(trait_(&fields[0], map));
+    let trait_ = try!(trait_(&fields[0]));
     Ok(Item::Trait(trait_))
 }
 
-fn trait_(json: &Value, map: &mut ItemMap) -> Result<Trait> {
+fn trait_(json: &Value) -> Result<Trait> {
     let mut fields = [("unsafety", None), ("items", None), ("generics", None),
                       ("bounds", None)];
     try!(collect_object(json, &mut fields, "Trait"));
     let unsaf = try!(unsafety(&fields[0].1.unwrap()));
-    let items = try!(item_datas(&fields[1].1.unwrap(), map));
+    let items = try!(item_datas(&fields[1].1.unwrap()));
     let generics = try!(generics(&fields[2].1.unwrap()));
     let bounds = try!(ty_param_bounds(&fields[3].1.unwrap()));
     Ok(Trait {
@@ -656,13 +664,13 @@ fn trait_(json: &Value, map: &mut ItemMap) -> Result<Trait> {
     })
 }
 
-fn item_impl(fields: &Slice, map: &mut ItemMap) -> Result<Item> {
+fn item_impl(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("impl item with {} fields", fields.len()); }
-    let impl_ = try!(impl_(&fields[0], map));
-    Ok(Item::Impl(impl_))
+    let impl_ = try!(impl_(&fields[0]));
+    Ok(Item::Impl(Arc::new(impl_).unwrap()))
 }
 
-fn impl_(json: &Value, map: &mut ItemMap) -> Result<Impl> {
+fn impl_(json: &Value) -> Result<Impl> {
     let mut fields = [("unsafety", None), ("generics", None), ("trait_", None),
                       ("for_", None), ("items", None), ("derived", None),
                       ("polarity", None)];
@@ -674,7 +682,7 @@ fn impl_(json: &Value, map: &mut ItemMap) -> Result<Impl> {
         _ => Some(try!(type_(fields[2].1.unwrap()))),
     };
     let for_ = try!(type_(fields[3].1.unwrap()));
-    let items = try!(item_datas(fields[4].1.unwrap(), map));
+    let items = try!(item_datas(fields[4].1.unwrap()));
     let derived = try!(collect_bool(fields[5].1.unwrap(), "Impl", "derived"));
     let negative = match *fields[6].1.unwrap() {
         Value::Null => None,
@@ -691,13 +699,13 @@ fn impl_(json: &Value, map: &mut ItemMap) -> Result<Impl> {
     })
 }
 
-fn item_method_decl(fields: &Slice) -> Result<Item> {
+fn item_method_decl(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("method decl item with {} fields", fields.len()); }
     let method = try!(method(&fields[0]));
     Ok(Item::MethodDecl(method))
 }
 
-fn item_method(fields: &Slice) -> Result<Item> {
+fn item_method(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("method item with {} fields", fields.len()); }
     let method = try!(method(&fields[0]));
     Ok(Item::Method(method))
@@ -721,7 +729,7 @@ fn method(json: &Value) -> Result<Method> {
     })
 }
 
-fn item_struct_field(fields: &Slice) -> Result<Item> {
+fn item_struct_field(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("struct field item with {} fields", fields.len()); }
     let struct_field = try!(struct_field(&fields[0]));
     Ok(Item::StructField(struct_field))
@@ -745,20 +753,20 @@ fn struct_field(json: &Value) -> Result<StructField> {
     }
 }
 
-fn item_variant(fields: &Slice, map: &mut ItemMap) -> Result<Item> {
+fn item_variant(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("variant item with {} fields", fields.len()); }
-    let variant = try!(variant(&fields[0], map));
+    let variant = try!(variant(&fields[0]));
     Ok(Item::Variant(variant))
 }
 
-fn variant(json: &Value, map: &mut ItemMap) -> Result<Variant> {
+fn variant(json: &Value) -> Result<Variant> {
     let mut fields = [("kind", None)];
     try!(collect_object(json, &mut fields, "Variant"));
-    let kind = try!(variant_kind(fields[0].1.unwrap(), map));
+    let kind = try!(variant_kind(fields[0].1.unwrap()));
     Ok(Variant { kind: kind })
 }
 
-fn variant_kind(json: &Value, map: &mut ItemMap) -> Result<VariantKind> {
+fn variant_kind(json: &Value) -> Result<VariantKind> {
     let (variant, fields) = try!(collect_enum(json, "VariantKind"));
     match variant.as_ref() {
         b"CLikeVariant" => {
@@ -772,7 +780,7 @@ fn variant_kind(json: &Value, map: &mut ItemMap) -> Result<VariantKind> {
         },
         b"StructVariant" => {
             if fields.len() != 1 { error!("StructVariant with {} fields", fields.len()); }
-            let variant_struct = try!(variant_struct(&fields[0], map));
+            let variant_struct = try!(variant_struct(&fields[0]));
             Ok(VariantKind::Struct(variant_struct))
         },
         _ => {
@@ -781,11 +789,11 @@ fn variant_kind(json: &Value, map: &mut ItemMap) -> Result<VariantKind> {
     }
 }
 
-fn variant_struct(json: &Value, map: &mut ItemMap) -> Result<VariantStruct> {
+fn variant_struct(json: &Value) -> Result<VariantStruct> {
     let mut fields = [("struct_type", None), ("fields", None), ("fields_stripped", None)];
     try!(collect_object(json, &mut fields, "VariantStruct"));
     let struct_type = try!(struct_type(fields[0].1.unwrap()));
-    let fields_ = try!(item_datas(fields[1].1.unwrap(), map));
+    let fields_ = try!(item_datas(fields[1].1.unwrap()));
     let private_fields = try!(collect_bool(fields[2].1.unwrap(), "VariantStruct",
                                            "fields_stripped"));
     Ok(VariantStruct {
@@ -805,19 +813,19 @@ fn struct_type(json: &Value) -> Result<StructType> {
     }
 }
 
-fn item_extern_func(fields: &Slice) -> Result<Item> {
+fn item_extern_func(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("extern func item with {} fields", fields.len()); }
     let func = try!(func(&fields[0]));
     Ok(Item::ExternFunc(func))
 }
 
-fn item_extern_static(fields: &Slice) -> Result<Item> {
+fn item_extern_static(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("extern static item with {} fields", fields.len()); }
     let static_ = try!(static_(&fields[0]));
     Ok(Item::ExternStatic(static_))
 }
 
-fn item_macro(fields: &Slice) -> Result<Item> {
+fn item_macro(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("macro item with {} fields", fields.len()); }
     let macro_ = try!(macro_(&fields[0]));
     Ok(Item::Macro(macro_))
@@ -831,23 +839,25 @@ fn macro_(json: &Value) -> Result<Macro> {
     Ok(Macro { source: source })
 }
 
-fn item_primitive(fields: &Slice) -> Result<Item> {
+fn item_primitive(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("primitive item with {} fields", fields.len()); }
     let primitive = try!(primitive(&fields[0]));
     Ok(Item::Primitive(primitive))
 }
 
-fn item_assoc_type(fields: &Slice) -> Result<Item> {
+fn item_assoc_type(fields: &JSlice) -> Result<Item> {
     if fields.len() != 2 { error!("associated type item with {} fields", fields.len()); }
-    let ty_param_bounds = try!(ty_param_bounds(&fields[0]));
-    let ty = match fields[1] {
-        Value::Null => None,
-        _ => Some(try!(type_(&fields[1]))),
+    let at = AssocType {
+        bounds: try!(ty_param_bounds(&fields[0])),
+        default: match fields[1] {
+            Value::Null => None,
+            _ => Some(try!(type_(&fields[1]))),
+        },
     };
-    Ok(Item::AssocType(ty_param_bounds, ty))
+    Ok(Item::AssocType(at))
 }
 
-fn item_default_impl(fields: &Slice) -> Result<Item> {
+fn item_default_impl(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("default impl item with {} fields", fields.len()); }
     let default_impl = try!(default_impl(&fields[0]));
     Ok(Item::DefaultImpl(default_impl))
@@ -917,21 +927,27 @@ fn where_predicate(json: &Value) -> Result<WherePredicate> {
     match variant.as_ref() {
         b"BoundPredicate" => {
             if fields.len() != 2 { error!("BoundPredicate with {} fields", fields.len()); }
-            let ty = try!(type_(&fields[0]));
-            let bounds = try!(ty_param_bounds(&fields[1]));
-            Ok(WherePredicate::Bound(ty, bounds))
+            let bwp = BoundWherePredicate {
+                ty: try!(type_(&fields[0])),
+                bounds: try!(ty_param_bounds(&fields[1])),
+            };
+            Ok(WherePredicate::Bound(bwp))
         },
         b"RegionPredicate" => {
             if fields.len() != 2 { error!("RegionPredicate with {} fields", fields.len()); }
-            let lt = try!(lifetime(&fields[0]));
-            let lts = try!(lifetimes(&fields[1]));
-            Ok(WherePredicate::Region(lt, lts))
+            let rwp = RegionWherePredicate {
+                lt: try!(lifetime(&fields[0])),
+                bounds: try!(lifetimes(&fields[1])),
+            };
+            Ok(WherePredicate::Region(rwp))
         },
         b"EqPredicate" => {
             if fields.len() != 2 { error!("EqPredicate with {} fields", fields.len()); }
-            let lhs = try!(type_(&fields[0]));
-            let rhs = try!(type_(&fields[1]));
-            Ok(WherePredicate::Eq(lhs, rhs))
+            let ewp = EqWherePredicate {
+                lhs: try!(type_(&fields[0])),
+                rhs: try!(type_(&fields[1])),
+            };
+            Ok(WherePredicate::Eq(ewp))
         },
         _ => error!("Unexpected WherePredicate variant: {:?}", variant),
     }
@@ -1078,7 +1094,7 @@ fn collect_object<'a>(obj: &'a Value, fields: &mut [(&str, Option<&'a Value>)],
     Ok(())
 }
 
-fn collect_array<'a>(json: &'a Value, obj: &str, field: &str) -> Result<&'a Slice> {
+fn collect_array<'a>(json: &'a Value, obj: &str, field: &str) -> Result<&'a JSlice> {
     match *json {
         Value::Array(ref s) => Ok(&s[..]),
         _ => error!("field {} on {} is not an array", field, obj),
@@ -1092,7 +1108,7 @@ fn collect_bool<'a>(json: &'a Value, obj: &str, field: &str) -> Result<bool> {
     }
 }
 
-fn collect_enum<'a>(json: &'a Value, obj: &str) -> Result<(&'a SByteString, &'a Slice)> {
+fn collect_enum<'a>(json: &'a Value, obj: &str) -> Result<(&'a SByteString, &'a JSlice)> {
     match *json {
         Value::String(ref s) => return Ok((s, &[])),
         _ => { },
