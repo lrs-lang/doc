@@ -6,7 +6,7 @@
 use lrs::io::{Write};
 
 use html::{Formatter, where_predicates, angle_generics, fn_in_out, write_raw_type,
-           write_abi};
+           write_abi, function};
 use html::markup::{self};
 use tree::*;
 
@@ -20,6 +20,12 @@ impl Formatter {
         try!(markup::short(&mut file, &item.docs.parts));
 
         try!(self.method_syntax(&mut file, impl_, item, method));
+        try!(function::args(&mut file, &method.decl, &item.docs));
+        try!(function::return_value(&mut file, &method.decl, &item.docs));
+
+        try!(markup::remarks(&mut file, &item.docs.parts));
+        try!(markup::examples(&mut file, &item.docs.parts));
+        try!(markup::see_also(&mut file, &item.docs.parts));
 
         try!(self.foot(&mut file));
         Ok(())

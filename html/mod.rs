@@ -295,6 +295,7 @@ fn write_raw_type<W: Write>(file: &mut W, t: &Type) -> Result {
             try!(file.write_all(b"]"));
         },
         Type::Bottom => {
+            try!(file.write_all(b"!"));
         },
         Type::Pointer(ref p) => {
             try!(file.write_all(b"*"));
@@ -360,10 +361,6 @@ fn fn_in_out<W: Write>(dst: &mut W, slf: &SelfTy, decl: &FnDecl) -> Result {
             true
         },
     };
-
-    if have_slf && decl.inputs.len() > 0 {
-        try!(dst.write_all(b", "));
-    }
 
     let mut first = !have_slf;
     for arg in &decl.inputs {
@@ -458,22 +455,24 @@ fn where_predicates<W: Write>(file: &mut W, generics: &Generics, prefix: &str) -
         if t.bounds.len() == 0 {
             continue;
         }
-        try!(file.write_all(prefix.as_bytes()));
         if first {
+            try!(file.write_all(prefix.as_bytes()));
             try!(file.write_all(b"where "));
         } else {
-            try!(file.write_all(b"\n     "));
+            try!(file.write_all(b"\n      "));
+            try!(file.write_all(prefix.as_bytes()));
         }
         first = false;
         try!(write_ty_param_bounds(file, &t.bounds));
         try!(file.write_all(b","));
     }
     for t in &generics.where_predicates {
-        try!(file.write_all(prefix.as_bytes()));
         if first {
+            try!(file.write_all(prefix.as_bytes()));
             try!(file.write_all(b"where "));
         } else {
             try!(file.write_all(b"\n      "));
+            try!(file.write_all(prefix.as_bytes()));
         }
         first = false;
         match *t {

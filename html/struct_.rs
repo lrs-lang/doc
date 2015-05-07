@@ -23,10 +23,12 @@ impl Formatter {
         try!(markup::short(&mut file, &docs.parts));
 
         try!(self.struct_syntax(&mut file, strukt));
-        try!(self.struct_fields(&mut file, strukt, docs));
+        try!(fields(&mut file, strukt, docs));
         try!(self.type_static_methods(&mut file, item));
+        try!(self.type_methods(&mut file, item));
 
         try!(markup::remarks(&mut file, &docs.parts));
+        try!(markup::examples(&mut file, &docs.parts));
         try!(markup::see_also(&mut file, &docs.parts));
 
         try!(self.foot(&mut file));
@@ -108,73 +110,73 @@ impl Formatter {
         Ok(())
     }
 
-    fn struct_fields<W: Write>(&mut self, mut file: &mut W, strukt: &Struct,
-                               docs: &Document) -> Result {
-        let mut have_public_fields = false;
-        for field in &strukt.fields {
-            if let Item::StructField(ref f) = field.inner {
-                if let StructField::Typed(_) = *f {
-                    have_public_fields = true;
-                    break;
-                }
+}
+
+fn fields<W: Write>(mut file: &mut W, strukt: &Struct, docs: &Document) -> Result {
+    let mut have_public_fields = false;
+    for field in &strukt.fields {
+        if let Item::StructField(ref f) = field.inner {
+            if let StructField::Typed(_) = *f {
+                have_public_fields = true;
+                break;
             }
         }
-
-        if !have_public_fields {
-            return Ok(());
-        }
-
-        try!(file.write_all(b"\
-            <h2>Fields</h2>\
-            <table>\
-                <thead>\
-                    <tr>\
-                    "));
-        if strukt.struct_type == StructType::Tuple {
-            try!(file.write_all(b"<th>Position</th>"));
-        } else {
-            try!(file.write_all(b"<th>Name</th>"));
-        }
-        try!(file.write_all(b"\
-                        <th>Type</th>\
-                        <th>Description</th>\
-                    </tr>\
-                </thead>\
-                <tbody>\
-                    "));
-
-        for (i, item) in strukt.fields.iter().enumerate() {
-            let field = match item.inner {
-                Item::StructField(ref f) => f,
-                _ => errexit!("struct field is not a StructField"),
-            };
-            let t = match *field {
-                StructField::Typed(ref t) => t,
-                _ => continue,
-            };
-            try!(file.write_all(b"<tr><td>"));
-            if strukt.struct_type == StructType::Tuple {
-                try!(write!(file, "{}", i + 1));
-            } else {
-                try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
-            }
-            try!(file.write_all(b"</td><td><code>"));
-            try!(write_raw_type(file, t));
-            try!(file.write_all(b"</code></td><td>"));
-            if strukt.struct_type == StructType::Tuple {
-                let field: ByteString = format!("{}", i + 1);
-                try!(markup::field_desc(file, &docs.parts, field.as_ref()));
-            } else {
-                try!(markup::all(file, &item.docs.parts));
-            }
-            try!(file.write_all(b"</td></tr>"));
-        }
-
-        try!(file.write_all(b"\
-                </tbody>\
-            </table>\
-            "));
-
-        Ok(())
     }
+
+    if !have_public_fields {
+        return Ok(());
+    }
+
+    try!(file.write_all(b"\
+        <h2>Fields</h2>\
+        <table>\
+            <thead>\
+                <tr>\
+                "));
+    if strukt.struct_type == StructType::Tuple {
+        try!(file.write_all(b"<th>Position</th>"));
+    } else {
+        try!(file.write_all(b"<th>Name</th>"));
+    }
+    try!(file.write_all(b"\
+                    <th>Type</th>\
+                    <th>Description</th>\
+                </tr>\
+            </thead>\
+            <tbody>\
+                "));
+
+    for (i, item) in strukt.fields.iter().enumerate() {
+        let field = match item.inner {
+            Item::StructField(ref f) => f,
+            _ => errexit!("struct field is not a StructField"),
+        };
+        let t = match *field {
+            StructField::Typed(ref t) => t,
+            _ => continue,
+        };
+        try!(file.write_all(b"<tr><td>"));
+        if strukt.struct_type == StructType::Tuple {
+            try!(write!(file, "{}", i + 1));
+        } else {
+            try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
+        }
+        try!(file.write_all(b"</td><td><code>"));
+        try!(write_raw_type(file, t));
+        try!(file.write_all(b"</code></td><td>"));
+        if strukt.struct_type == StructType::Tuple {
+            let field: ByteString = format!("{}", i + 1);
+            try!(markup::field_desc(file, &docs.parts, field.as_ref()));
+        } else {
+            try!(markup::all(file, &item.docs.parts));
+        }
+        try!(file.write_all(b"</td></tr>"));
+    }
+
+    try!(file.write_all(b"\
+            </tbody>\
+        </table>\
+        "));
+
+    Ok(())
 }

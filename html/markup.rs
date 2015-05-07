@@ -4,7 +4,7 @@
 
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::io::{Write};
-use lrs::string::{AsByteStr, ByteString};
+use lrs::string::{AsByteStr, ByteString, ByteStr};
 use lrs::util::{memchr};
 use lrs::bx::{Box};
 
@@ -38,10 +38,66 @@ pub fn field_desc<W: Write>(w: &mut W, parts: &[Part], name: &[u8]) -> Result {
             Part::SectionHeader(_, _) => { },
             Part::Block(ref data) => {
                 for attr in &data.attributes {
-                    println!("{}", attr.name);
                     if attr.name.trim() == "field" {
                         if let Some(ref a) = attr.args {
                             if a.trim() == name.as_byte_str() {
+                                try!(block_data(w, data, true));
+                                return Ok(());
+                            }
+                        }
+                    }
+                }
+            },
+        }
+    }
+    Ok(())
+}
+
+pub fn return_value<W: Write>(w: &mut W, parts: &[Part]) -> Result {
+    for part in parts {
+        match *part {
+            Part::SectionHeader(1, _) => break,
+            Part::SectionHeader(_, _) => { },
+            Part::Block(ref data) => {
+                for attr in &data.attributes {
+                    if attr.name.trim() == "return_value" {
+                        try!(block_data(w, data, true));
+                        return Ok(());
+                    }
+                }
+            },
+        }
+    }
+    Ok(())
+}
+
+pub fn has_return_value(parts: &[Part]) -> bool {
+    for part in parts {
+        match *part {
+            Part::SectionHeader(1, _) => break,
+            Part::SectionHeader(_, _) => { },
+            Part::Block(ref data) => {
+                for attr in &data.attributes {
+                    if attr.name.trim() == "return_value" {
+                        return true;
+                    }
+                }
+            },
+        }
+    }
+    false
+}
+
+pub fn arg_desc<W: Write>(w: &mut W, parts: &[Part], name: &ByteStr) -> Result {
+    for part in parts {
+        match *part {
+            Part::SectionHeader(1, _) => break,
+            Part::SectionHeader(_, _) => { },
+            Part::Block(ref data) => {
+                for attr in &data.attributes {
+                    if attr.name.trim() == "argument" {
+                        if let Some(ref a) = attr.args {
+                            if a.trim() == name {
                                 try!(block_data(w, data, true));
                                 return Ok(());
                             }
@@ -67,6 +123,10 @@ pub fn description<W: Write>(w: &mut W, parts: &[Part]) -> Result {
 
 pub fn remarks<W: Write>(w: &mut W, parts: &[Part]) -> Result {
     section(w, parts, "Remarks")
+}
+
+pub fn examples<W: Write>(w: &mut W, parts: &[Part]) -> Result {
+    section(w, parts, "Examples")
 }
 
 pub fn see_also<W: Write>(w: &mut W, parts: &[Part]) -> Result {
@@ -142,28 +202,38 @@ pub fn text<W: Write>(mut w: &mut W, txt: &Text) -> Result {
 
 pub fn link<W: Write>(mut w: &mut W, link: &ByteString,
                       txt: &Option<Box<TextBlock>>) -> Result {
-    if let Some(ref txt) = *txt {
-        try!(write!(w, "<a href=\"{}\">", link));
-        try!(text_block(w, txt));
-        try!(write!(w, "</a>"));
-        return Ok(());
-    }
-    
+    try!(w.write_all(b"<a href=\""));
+
     if link.as_ref().starts_with(b"man:") {
         if let Some(p) = memchr(link.as_ref(), b'(') {
             try!(write!(w,
-                "<a href=\"http://man7.org/linux/man-pages/man{}/{}.{}.html\">{}</a>",
-                link[p+1..link.len()-1], link[4..p], link[p+1..link.len()-1], link[4..]));
+                "http://man7.org/linux/man-pages/man{}/{}.{}.html\">",
+                link[p+1..link.len()-1], link[4..p], link[p+1..link.len()-1]));
+            match *txt {
+                Some(ref txt) => { try!(text_block(w, txt)); }
+                _ => { try!(w.write_all(link[4..].as_ref())); }
+            }
+            try!(w.write_all(b"</a>"));
             return Ok(());
         }
     }
 
     if link.as_ref().starts_with(b"lrs") {
-        try!(write!(w, "<a href=\"./{}.html\">{}</a>", link, link));
+        try!(write!(w, "./{}.html\">", link));
+        match *txt {
+            Some(ref txt) => { try!(text_block(w, txt)); }
+            _ => { try!(w.write_all(link.as_ref())); }
+        }
+        try!(w.write_all(b"</a>"));
         return Ok(());
     }
 
-    try!(write!(w, "<a href=\"{}\">{}</a>", link, link));
+    try!(write!(w, "{}\">", link));
+    match *txt {
+        Some(ref txt) => { try!(text_block(w, txt)); }
+        _ => { try!(w.write_all(link.as_ref())); }
+    }
+    try!(w.write_all(b"</a>"));
     Ok(())
 }
 
@@ -184,7 +254,7 @@ pub fn block_data<W: Write>(mut w: &mut W, data: &BlockData,
     if !show_hidden {
         for attr in &data.attributes {
             let name = attr.name.trim();
-            for &aname in &["hidden", "arg", "field"][..] {
+            for &aname in &["hidden", "argument", "return_value", "field"][..] {
                 if name == aname {
                     return Ok(());
                 }
