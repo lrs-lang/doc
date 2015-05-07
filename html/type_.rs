@@ -11,12 +11,12 @@ use markup::{Document};
 use tree::*;
 
 impl Formatter {
-    pub fn type_(&mut self, item: &ItemData, docs: &Document) -> Result {
+    pub fn type_(&mut self, item: &ItemData) -> Result {
         match item.inner {
-            Item::Struct(ref  s) => self.struct_(item, s, docs),
-            Item::Enum(ref    e) => self.enum_(e,   docs),
-            Item::Typedef(ref t) => self.typedef(t, docs),
-            Item::Trait(ref   t) => self.trait_(t,  docs),
+            Item::Struct(ref  s) => self.struct_(item, s),
+            Item::Enum(ref    e) => self.enum_(item, e),
+            Item::Typedef(ref t) => self.typedef(item, t),
+            Item::Trait(ref   t) => self.trait_(item, t),
             _ => abort!(),
         }
     }
@@ -150,10 +150,6 @@ impl Formatter {
                 SelfTy::Value => { try!(file.write_all(b"self")); }
                 SelfTy::Borrowed(ref lt, mutable) => {
                     try!(file.write_all(b"&"));
-                    if let Some(ref lt) = *lt {
-                        try!(file.write_all(lt.as_ref()));
-                        try!(file.write_all(b" "));
-                    }
                     if mutable {
                         try!(file.write_all(b"mut "));
                     }

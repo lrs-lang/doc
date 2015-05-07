@@ -13,23 +13,22 @@ use markup::{Document};
 use tree::*;
 
 impl Formatter {
-    pub fn struct_(&mut self, item: &ItemData, strukt: &Struct,
-                   docs: &Document) -> Result {
+    pub fn struct_(&mut self, item: &ItemData, strukt: &Struct) -> Result {
         let mut file = try!(self.file());
 
         try!(self.head(&mut file, "Struct "));
         try!(self.h1(&mut file, "Struct "));
 
-        try!(markup::short(&mut file, &docs.parts));
+        try!(markup::short(&mut file, &item.docs.parts));
 
         try!(self.struct_syntax(&mut file, strukt));
-        try!(fields(&mut file, strukt, docs));
+        try!(fields(&mut file, strukt, &item.docs));
         try!(self.type_static_methods(&mut file, item));
         try!(self.type_methods(&mut file, item));
 
-        try!(markup::remarks(&mut file, &docs.parts));
-        try!(markup::examples(&mut file, &docs.parts));
-        try!(markup::see_also(&mut file, &docs.parts));
+        try!(markup::remarks(&mut file, &item.docs.parts));
+        try!(markup::examples(&mut file, &item.docs.parts));
+        try!(markup::see_also(&mut file, &item.docs.parts));
 
         try!(self.foot(&mut file));
         Ok(())
@@ -139,7 +138,6 @@ fn fields<W: Write>(mut file: &mut W, strukt: &Struct, docs: &Document) -> Resul
         try!(file.write_all(b"<th>Name</th>"));
     }
     try!(file.write_all(b"\
-                    <th>Type</th>\
                     <th>Description</th>\
                 </tr>\
             </thead>\
@@ -161,9 +159,7 @@ fn fields<W: Write>(mut file: &mut W, strukt: &Struct, docs: &Document) -> Resul
         } else {
             try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
         }
-        try!(file.write_all(b"</td><td><code>"));
-        try!(write_raw_type(file, t));
-        try!(file.write_all(b"</code></td><td>"));
+        try!(file.write_all(b"</td><td>"));
         if strukt.struct_type == StructType::Tuple {
             let field: ByteString = format!("{}", i + 1);
             try!(markup::field_desc(file, &docs.parts, field.as_ref()));

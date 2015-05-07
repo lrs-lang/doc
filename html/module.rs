@@ -22,6 +22,8 @@ impl Formatter {
         try!(self.module_modules(&mut file, module));
         try!(self.module_types(&mut file, module));
         try!(self.module_functions(&mut file, module));
+        try!(self.module_constants(&mut file, module));
+        try!(self.module_statics(&mut file, module));
 
         try!(self.foot(&mut file));
         Ok(())
@@ -127,7 +129,7 @@ impl Formatter {
         for &(item, kind, class) in &types {
             try!(self.path.reserve(1));
             self.path.push(try!(item.name.as_ref().unwrap().clone()));
-            try!(self.type_(&item, &item.docs));
+            try!(self.type_(&item));
 
             try!(file.write_all(b"\
                 <tr>\
@@ -199,6 +201,134 @@ impl Formatter {
             try!(self.path.reserve(1));
             self.path.push(try!(item.name.as_ref().unwrap().clone()));
             try!(self.function(item, func));
+
+            try!(file.write_all(b"\
+                <tr>\
+                    <td>\
+                        <a href=\"./\
+                    "));
+            try!(file.write_all(try!(path::path(&self.path)).as_ref()));
+            try!(file.write_all(b"\">"));
+            try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
+            try!(file.write_all(b"\
+                        </a>\
+                    </td>\
+                    <td>\
+                    "));
+            try!(markup::short(file, &item.docs.parts));
+            try!(file.write_all(b"\
+                    </td>\
+                </tr>\
+                "));
+
+            self.path.pop();
+        }
+
+        try!(file.write_all(b"\
+                </tbody>\
+            </table>\
+            "));
+
+        Ok(())
+    }
+
+    fn module_constants<W: Write>(&mut self, file: &mut W, module: &Module) -> Result {
+        let mut constants: Vec<_> = Vec::new();
+
+        for item in &module.items {
+            match item.inner {
+                Item::Constant(ref c) => constants.push((item, c)),
+                _ => { },
+            }
+        }
+
+        if constants.len() == 0 {
+            return Ok(());
+        }
+
+        constants.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap().as_ref()
+                                          .cmp(f2.name.as_ref().unwrap().as_ref()));
+
+        try!(file.write_all(b"\
+            <h2>Constants</h2>\
+            <table>\
+                <thead>\
+                    <tr>\
+                        <th>Name</th>\
+                        <th>Description</th>\
+                    </tr>\
+                </thead>\
+                <tbody>\
+                    "));
+
+        for &(item, constant) in &constants {
+            try!(self.path.reserve(1));
+            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            try!(self.constant(item, constant));
+
+            try!(file.write_all(b"\
+                <tr>\
+                    <td>\
+                        <a href=\"./\
+                    "));
+            try!(file.write_all(try!(path::path(&self.path)).as_ref()));
+            try!(file.write_all(b"\">"));
+            try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
+            try!(file.write_all(b"\
+                        </a>\
+                    </td>\
+                    <td>\
+                    "));
+            try!(markup::short(file, &item.docs.parts));
+            try!(file.write_all(b"\
+                    </td>\
+                </tr>\
+                "));
+
+            self.path.pop();
+        }
+
+        try!(file.write_all(b"\
+                </tbody>\
+            </table>\
+            "));
+
+        Ok(())
+    }
+
+    fn module_statics<W: Write>(&mut self, file: &mut W, module: &Module) -> Result {
+        let mut statics: Vec<_> = Vec::new();
+
+        for item in &module.items {
+            match item.inner {
+                Item::Static(ref s) => statics.push((item, s)),
+                _ => { },
+            }
+        }
+
+        if statics.len() == 0 {
+            return Ok(());
+        }
+
+        statics.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap().as_ref()
+                                        .cmp(f2.name.as_ref().unwrap().as_ref()));
+
+        try!(file.write_all(b"\
+            <h2>Statics</h2>\
+            <table>\
+                <thead>\
+                    <tr>\
+                        <th>Name</th>\
+                        <th>Description</th>\
+                    </tr>\
+                </thead>\
+                <tbody>\
+                    "));
+
+        for &(item, static_) in &statics {
+            try!(self.path.reserve(1));
+            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            try!(self.static_(item, static_));
 
             try!(file.write_all(b"\
                 <tr>\

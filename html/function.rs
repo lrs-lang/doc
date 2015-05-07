@@ -75,7 +75,6 @@ pub fn args<W: Write>(mut file: &mut W, decl: &FnDecl, docs: &Document) -> Resul
             <thead>\
                 <tr>\
                     <th>Name</th>\
-                    <th>Type</th>\
                     <th>Description</th>\
                 </tr>\
             </thead>\
@@ -90,11 +89,6 @@ pub fn args<W: Write>(mut file: &mut W, decl: &FnDecl, docs: &Document) -> Resul
         try!(file.write_all(arg.name.as_ref()));
         try!(file.write_all(b"\
                 </td>\
-                <td><code>\
-                "));
-        try!(write_raw_type(file, &arg.type_));
-        try!(file.write_all(b"\
-                </code></td>\
                 <td>\
                 "));
         try!(markup::arg_desc(file, &docs.parts, &arg.name));

@@ -9,7 +9,7 @@ use markup::{Document};
 use tree::*;
 
 impl Formatter {
-    pub fn typedef(&mut self, _: &Typedef, _: &Document) -> Result {
+    pub fn typedef(&mut self, item: &ItemData, typedef: &Typedef) -> Result {
         let mut file = try!(self.file());
 
         try!(self.head(&mut file, "Typedef "));

@@ -12,15 +12,16 @@ use html::markup::{self};
 use tree::*;
 
 impl Formatter {
-    pub fn method(&mut self, impl_: &Impl, item: &ItemData, method: &Method) -> Result {
+    pub fn trait_method(&mut self, item: &ItemData, method: &Method) -> Result {
         let mut file = try!(self.file());
 
-        try!(self.head(&mut file, "Method "));
-        try!(self.h1(&mut file, "Method "));
+        try!(self.head(&mut file, "Trait method "));
+        try!(self.h1(&mut file, "Trait method "));
 
         try!(markup::short(&mut file, &item.docs.parts));
 
-        try!(self.method_syntax(&mut file, impl_, item, method));
+        try!(syntax(&mut file, method, item.name.as_ref().unwrap()));
+
         try!(function::args(&mut file, &method.decl, &item.docs));
         try!(function::return_value(&mut file, &method.decl, &item.docs));
 
@@ -31,46 +32,16 @@ impl Formatter {
         try!(self.foot(&mut file));
         Ok(())
     }
-
-    fn method_syntax<W: Write>(&mut self, file: &mut W, impl_: &Impl,
-                               item: &ItemData, method: &Method) -> Result {
-        try!(file.write_all(b"\
-            <h2>Syntax</h2>\
-            <pre>\
-                impl\
-            "));
-
-        // impl block
-
-        let mut have_where_predicates = impl_.generics.where_predicates.len() > 0;
-        have_where_predicates |= try!(angle_generics(file, &impl_.generics));
-
-        try!(file.write_all(b" "));
-        try!(write_raw_type(file, &impl_.for_));
-
-        if have_where_predicates {
-            try!(file.write_all(b"\n"));
-            try!(where_predicates(file, &impl_.generics, "    "));
-            try!(file.write_all(b"\n{\n"));
-        } else {
-            try!(file.write_all(b" {\n"));
-        }
-
-        // fn block
-
-        method_syntax(file, method, self.path.last().as_ref().unwrap());
-
-        try!(file.write_all(b"\
-                \n}\
-            </pre>\
-            "));
-
-        Ok(())
-    }
 }
 
-pub fn method_syntax<W: Write>(file: &mut W, method: &Method, name: &ByteStr) -> Result {
-    try!(file.write_all(b"    "));
+
+// This is almost the same as method::method_syntax buf without the extra whitespace...
+fn syntax<W: Write>(file: &mut W, method: &Method, name: &ByteStr) -> Result {
+    try!(file.write_all(b"\
+        <h2>Syntax</h2>\
+        <pre>\
+        "));
+
     if method.unsaf {
         try!(file.write_all(b"unsafe "));
     }
@@ -87,8 +58,12 @@ pub fn method_syntax<W: Write>(file: &mut W, method: &Method, name: &ByteStr) ->
 
     if have_where_predicates {
         try!(file.write_all(b"\n"));
-        try!(where_predicates(file, &method.generics, "        "));
+        try!(where_predicates(file, &method.generics, "   "));
     }
+
+    try!(file.write_all(b"\
+        </pre>\
+        "));
 
     Ok(())
 }
