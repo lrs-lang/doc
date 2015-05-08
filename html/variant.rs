@@ -14,7 +14,7 @@ use tree::*;
 impl Formatter {
     pub fn variant(&mut self, enum_item: &ItemData, enum_: &Enum, item: &ItemData,
                    variant: &Variant) -> Result {
-        let mut file = try!(self.file());
+        let mut file: Vec<_> = Vec::new();
 
         try!(self.head(&mut file, "Variant "));
         try!(self.h1(&mut file, "Variant "));
@@ -29,6 +29,8 @@ impl Formatter {
         try!(markup::see_also(&mut file, &item.docs.parts));
 
         try!(self.foot(&mut file));
+
+        try!(try!(self.file()).write_all(&file));
         Ok(())
     }
 }

@@ -13,7 +13,7 @@ use tree::*;
 
 impl Formatter {
     pub fn trait_(&mut self, item: &ItemData, trait_: &Trait) -> Result {
-        let mut file = try!(self.file());
+        let mut file: Vec<_> = Vec::new();
 
         try!(self.head(&mut file, "Trait "));
         try!(self.h1(&mut file, "Trait "));
@@ -30,12 +30,15 @@ impl Formatter {
                                          .cmp(f2.name.as_ref().unwrap().as_ref()));
 
         try!(self.trait_methods(&mut file, &required));
+        try!(self.type_trait_impls(&mut file, item));
 
         try!(markup::remarks(&mut file, &item.docs.parts));
         try!(markup::examples(&mut file, &item.docs.parts));
         try!(markup::see_also(&mut file, &item.docs.parts));
 
         try!(self.foot(&mut file));
+
+        try!(try!(self.file()).write_all(&file));
         Ok(())
     }
 
@@ -144,7 +147,7 @@ impl Formatter {
 
             try!(file.write_all(b"\
                 <tr>\
-                    <td><code>\
+                    <td><code class=\"no_break\">\
                     "));
             match method.self_ {
                 SelfTy::Static => { },

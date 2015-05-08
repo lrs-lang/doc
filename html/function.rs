@@ -13,7 +13,7 @@ use tree::*;
 
 impl Formatter {
     pub fn function(&mut self, item: &ItemData, func: &Func) -> Result {
-        let mut file = try!(self.file());
+        let mut file: Vec<_> = Vec::new();
 
         try!(self.head(&mut file, "Function "));
         try!(self.h1(&mut file, "Function "));
@@ -29,6 +29,8 @@ impl Formatter {
         try!(markup::see_also(&mut file, &item.docs.parts));
 
         try!(self.foot(&mut file));
+
+        try!(try!(self.file()).write_all(&file));
         Ok(())
     }
 }

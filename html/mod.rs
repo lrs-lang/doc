@@ -17,6 +17,7 @@ mod markup;
 
 mod trait_;
 mod trait_method;
+mod trait_impl;
 mod typedef;
 mod enum_;
 mod variant;
@@ -92,7 +93,7 @@ impl Formatter {
         self.dir.rel_open(&try!(path::path(&self.path)), flags)
     }
 
-    fn head(&self, file: &mut File, prefix: &str) -> Result {
+    fn head<W: Write>(&self, file: &mut W, prefix: &str) -> Result {
         try!(file.write_all(b"\
             <html>\
                 <head>\
@@ -109,7 +110,7 @@ impl Formatter {
         Ok(())
     }
 
-    fn foot(&self, file: &mut File) -> Result {
+    fn foot<W: Write>(&self, file: &mut W) -> Result {
         try!(file.write_all(b"\
                 </body>\
             </html>\
@@ -117,7 +118,7 @@ impl Formatter {
         Ok(())
     }
 
-    fn h1(&self, file: &mut File, prefix: &str) -> Result {
+    fn h1<W: Write>(&self, file: &mut W, prefix: &str) -> Result {
         try!(file.write_all(b"<h1>"));
         try!(file.write_all(prefix.as_bytes()));
 

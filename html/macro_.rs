@@ -11,7 +11,7 @@ use tree::*;
 
 impl Formatter {
     pub fn macro_(&mut self, item: &ItemData, macro_: &Macro) -> Result {
-        let mut file = try!(self.file());
+        let mut file: Vec<_> = Vec::new();
 
         try!(self.head(&mut file, "Macro "));
         try!(self.h1(&mut file, "Macro "));
@@ -25,6 +25,8 @@ impl Formatter {
         try!(markup::see_also(&mut file, &item.docs.parts));
 
         try!(self.foot(&mut file));
+
+        try!(try!(self.file()).write_all(&file));
         Ok(())
     }
 }

@@ -11,7 +11,7 @@ use tree::*;
 
 impl Formatter {
     pub fn module(&mut self, module: &Module, docs: &Document) -> Result {
-        let mut file = try!(self.file());
+        let mut file: Vec<_> = Vec::new();
 
         try!(self.head(&mut file, "Module "));
         try!(self.h1(&mut file, "Module "));
@@ -27,6 +27,8 @@ impl Formatter {
         try!(self.module_macros(&mut file, module));
 
         try!(self.foot(&mut file));
+
+        try!(try!(self.file()).write_all(&file));
         Ok(())
     }
 

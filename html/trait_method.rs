@@ -13,7 +13,7 @@ use tree::*;
 
 impl Formatter {
     pub fn trait_method(&mut self, item: &ItemData, method: &Method) -> Result {
-        let mut file = try!(self.file());
+        let mut file: Vec<_> = Vec::new();
 
         try!(self.head(&mut file, "Trait method "));
         try!(self.h1(&mut file, "Trait method "));
@@ -30,6 +30,9 @@ impl Formatter {
         try!(markup::see_also(&mut file, &item.docs.parts));
 
         try!(self.foot(&mut file));
+
+        try!(try!(self.file()).write_all(&file));
+
         Ok(())
     }
 }

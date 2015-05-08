@@ -148,7 +148,7 @@ impl Formatter {
 
             try!(file.write_all(b"\
                 <tr>\
-                    <td><code>\
+                    <td><code class=\"no_break\">\
                     "));
             match method.self_ {
                 SelfTy::Static => { },
@@ -243,7 +243,7 @@ impl Formatter {
 
             try!(self.path.reserve(1));
             self.path.push(try!(trait_item.name.as_ref().unwrap().clone()));
-            // try!(self.method(impl_, item, method));
+            try!(self.trait_impl(&impls[i+1-num_impls..i+1]));
 
             try!(file.write_all(b"\
                 <tr>\
