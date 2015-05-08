@@ -23,7 +23,7 @@ pub struct ItemData {
     pub public: bool,
     pub node: DefId,
     pub parent: RefCell<Option<Arc<ItemData>>>,
-    pub impls: RefCell<SVec<Arc<Impl>>>,
+    pub impls: RefCell<SVec<Arc<ItemData>>>,
 }
 
 pub enum Attribute {
@@ -42,7 +42,7 @@ pub enum Item {
     Static(Static),
     Constant(Constant),
     Trait(Trait),
-    Impl(Arc<Impl>),
+    Impl(Impl),
     MethodDecl(Method),
     Method(Method),
     StructField(StructField),
@@ -421,7 +421,7 @@ pub trait Walker: Sized {
     fn walk_variant_struct              (&mut self, val: &VariantStruct            ) { walk_variant_struct              (self, val) }
     fn walk_struct_field                (&mut self, val: &StructField              ) { walk_struct_field                (self, val) }
     fn walk_method                      (&mut self, val: &Method                   ) { walk_method                      (self, val) }
-    fn walk_impl                        (&mut self, val: &Arc<Impl>                ) { walk_impl                        (self, val) }
+    fn walk_impl                        (&mut self, val: &Impl                     ) { walk_impl                        (self, val) }
     fn walk_self_ty                     (&mut self, val: &SelfTy                   ) { walk_self_ty                     (self, val) }
     fn walk_argument                    (&mut self, val: &Argument                 ) { walk_argument                    (self, val) }
     fn walk_constant                    (&mut self, val: &Constant                 ) { walk_constant                    (self, val) }
@@ -469,7 +469,7 @@ pub fn walk_attribute         <W: Walker> ( _: &mut W , _: &Attribute         ) 
 ///     Static(Static),
 ///     Constant(Constant),
 ///     Trait(Trait),
-///     Impl(Arc<Impl>),
+///     Impl(Impl),
 ///     MethodDecl(Method),
 ///     Method(Method),
 ///     StructField(StructField),
@@ -994,7 +994,7 @@ pub fn walk_method            <W: Walker> ( w: &mut W , val: &Method            
 ///     pub derived: bool,
 ///     pub negative: Option<bool>,
 /// }
-pub fn walk_impl              <W: Walker> ( w: &mut W , val: &Arc<Impl>         ) {
+pub fn walk_impl              <W: Walker> ( w: &mut W , val: &Impl         ) {
     w.walk_generics(&val.generics);
     if let Some(ref t) = val.trait_ {
         w.walk_type(t);

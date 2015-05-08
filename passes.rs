@@ -5,7 +5,7 @@
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::rc::{Arc};
 use lrs::vec::{SVec};
-use tree::{self, Walker, ItemData, ResolvedPath, Crate, Impl, Type};
+use tree::{self, Walker, ItemData, ResolvedPath, Crate, Impl, Type, Item};
 use hashmap::{ItemMap};
 
 pub fn run(krate: &Crate) {
@@ -55,12 +55,14 @@ impl<'a> Walker for LinkTypes<'a> {
 struct CollectImpls;
 
 impl Walker for CollectImpls {
-    fn walk_impl(&mut self, val: &Arc<Impl>) {
-        if let Type::ResolvedPath(ref r) = val.for_ {
-            if let Some(ref i) = *r.item.borrow() {
-                i.impls.borrow_mut().push(val.new_ref());
+    fn walk_item_data(&mut self, val: &Arc<ItemData>) {
+        if let Item::Impl(ref i) = val.inner {
+            if let Type::ResolvedPath(ref r) = i.for_ {
+                if let Some(ref i) = *r.item.borrow() {
+                    i.impls.borrow_mut().push(val.new_ref());
+                }
             }
         }
-        tree::walk_impl(self, val);
+        tree::walk_item_data(self, val);
     }
 }

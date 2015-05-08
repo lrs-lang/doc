@@ -25,6 +25,7 @@ impl Formatter {
         try!(fields(&mut file, strukt, &item.docs));
         try!(self.type_static_methods(&mut file, item));
         try!(self.type_methods(&mut file, item));
+        try!(self.type_trait_impls(&mut file, item));
 
         try!(markup::remarks(&mut file, &item.docs.parts));
         try!(markup::examples(&mut file, &item.docs.parts));

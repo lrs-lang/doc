@@ -667,7 +667,7 @@ fn trait_(json: &Value) -> Result<Trait> {
 fn item_impl(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("impl item with {} fields", fields.len()); }
     let impl_ = try!(impl_(&fields[0]));
-    Ok(Item::Impl(Arc::new(impl_).unwrap()))
+    Ok(Item::Impl(impl_))
 }
 
 fn impl_(json: &Value) -> Result<Impl> {

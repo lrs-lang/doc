@@ -24,6 +24,7 @@ impl Formatter {
         try!(self.module_functions(&mut file, module));
         try!(self.module_constants(&mut file, module));
         try!(self.module_statics(&mut file, module));
+        try!(self.module_macros(&mut file, module));
 
         try!(self.foot(&mut file));
         Ok(())
@@ -329,6 +330,73 @@ impl Formatter {
             try!(self.path.reserve(1));
             self.path.push(try!(item.name.as_ref().unwrap().clone()));
             try!(self.static_(item, static_));
+
+            try!(file.write_all(b"\
+                <tr>\
+                    <td>\
+                        <a href=\"./\
+                    "));
+            try!(file.write_all(try!(path::path(&self.path)).as_ref()));
+            try!(file.write_all(b"\">"));
+            try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
+            try!(file.write_all(b"\
+                        </a>\
+                    </td>\
+                    <td>\
+                    "));
+            try!(markup::short(file, &item.docs.parts));
+            try!(file.write_all(b"\
+                    </td>\
+                </tr>\
+                "));
+
+            self.path.pop();
+        }
+
+        try!(file.write_all(b"\
+                </tbody>\
+            </table>\
+            "));
+
+        Ok(())
+    }
+
+    fn module_macros<W: Write>(&mut self, file: &mut W, module: &Module) -> Result {
+        if self.path.len() != 1 {
+            return Ok(());
+        }
+
+        let mut macros: Vec<_> = Vec::new();
+
+        for item in &module.items {
+            if let Item::Macro(ref m) = item.inner {
+                macros.push((item, m));
+            }
+        }
+
+        if macros.len() == 0 {
+            return Ok(());
+        }
+
+        macros.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap().as_ref()
+                                        .cmp(f2.name.as_ref().unwrap().as_ref()));
+
+        try!(file.write_all(b"\
+            <h2>Macros</h2>\
+            <table>\
+                <thead>\
+                    <tr>\
+                        <th>Name</th>\
+                        <th>Description</th>\
+                    </tr>\
+                </thead>\
+                <tbody>\
+                    "));
+
+        for &(item, macro_) in &macros {
+            try!(self.path.reserve(1));
+            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            try!(self.macro_(item, macro_));
 
             try!(file.write_all(b"\
                 <tr>\

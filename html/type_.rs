@@ -4,6 +4,7 @@
 
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::io::{Write};
+use lrs::iter::{IteratorExt};
 
 use html::{path, Formatter, write_raw_type};
 use html::markup::{self};
@@ -27,13 +28,15 @@ impl Formatter {
 
         let mut methods: Vec<_> = Vec::new();
 
-        for impl_ in &*impls {
-            if impl_.trait_.is_none() {
-                for item in &impl_.items {
-                    if let Item::Method(ref method) = item.inner {
-                        if let SelfTy::Static = method.self_ {
-                            try!(methods.reserve(1));
-                            methods.push((impl_, item, method));
+        for impl_item in &*impls {
+            if let Item::Impl(ref impl_) = impl_item.inner {
+                if impl_.trait_.is_none() {
+                    for item in &impl_.items {
+                        if let Item::Method(ref method) = item.inner {
+                            if let SelfTy::Static = method.self_ {
+                                try!(methods.reserve(1));
+                                methods.push((impl_, item, method));
+                            }
                         }
                     }
                 }
@@ -100,16 +103,18 @@ impl Formatter {
 
         let mut methods: Vec<_> = Vec::new();
 
-        for impl_ in &*impls {
-            if impl_.trait_.is_none() {
-                for item in &impl_.items {
-                    if let Item::Method(ref method) = item.inner {
-                        match method.self_ {
-                            SelfTy::Static => { },
-                            _ => {
-                                try!(methods.reserve(1));
-                                methods.push((impl_, item, method));
-                            },
+        for impl_item in &*impls {
+            if let Item::Impl(ref impl_) = impl_item.inner {
+                if impl_.trait_.is_none() {
+                    for item in &impl_.items {
+                        if let Item::Method(ref method) = item.inner {
+                            match method.self_ {
+                                SelfTy::Static => { },
+                                _ => {
+                                    try!(methods.reserve(1));
+                                    methods.push((impl_, item, method));
+                                },
+                            }
                         }
                     }
                 }
@@ -177,6 +182,96 @@ impl Formatter {
                 "));
 
             self.path.pop();
+        }
+
+        try!(file.write_all(b"\
+                </tbody>\
+            </table>\
+            "));
+
+        Ok(())
+    }
+
+    pub fn type_trait_impls<W: Write>(&mut self, mut file: &mut W,
+                                      item: &ItemData) -> Result {
+        let all_impls = item.impls.borrow();
+
+        let mut impls: Vec<_> = Vec::new();
+
+        for impl_item in &*all_impls {
+            if let Item::Impl(ref impl_) = impl_item.inner {
+                if let Some(ref trait_) = impl_.trait_ {
+                    if let Type::ResolvedPath(ref path) = *trait_ {
+                        let borrow = path.item.borrow();
+                        if let Some(ref trait_item) = *borrow {
+                            try!(impls.reserve(1));
+                            impls.push((impl_item, impl_, trait_item.new_ref(), trait_));
+                        }
+                    }
+                }
+            }
+        }
+
+        if impls.len() == 0 {
+            return Ok(());
+        }
+
+        impls.sort_by(|&(_, _, ref t1, _), &(_, _, ref t2, _)| t1.name.as_ref().unwrap().as_ref()
+                                                          .cmp(t2.name.as_ref().unwrap().as_ref()));
+
+        try!(file.write_all(b"\
+            <h2>Trait implementations</h2>\
+            <table>\
+                <thead>\
+                    <tr>\
+                        <th>Name</th>\
+                        <th>Description</th>\
+                    </tr>\
+                </thead>\
+                <tbody>\
+                    "));
+
+        let mut num_impls = 1;
+
+        for (i, &(impl_item, impl_, ref trait_item, trait_)) in impls.iter().enumerate() {
+            if i + 1 < impls.len() {
+                if &*impls[i+1].2 as *const ItemData == &**trait_item as *const ItemData {
+                    num_impls += 1;
+                    continue;
+                }
+            }
+
+            try!(self.path.reserve(1));
+            self.path.push(try!(trait_item.name.as_ref().unwrap().clone()));
+            // try!(self.method(impl_, item, method));
+
+            try!(file.write_all(b"\
+                <tr>\
+                    <td>\
+                        <a href=\"./\
+                    "));
+            try!(file.write_all(try!(path::path(&self.path)).as_ref()));
+            try!(file.write_all(b"\">"));
+            try!(file.write_all(trait_item.name.as_ref().unwrap().as_ref()));
+            try!(file.write_all(b"\
+                        </a>\
+                        "));
+            if num_impls > 1 {
+                try!(write!(file, " ({} times)", num_impls));
+            }
+            try!(file.write_all(b"\
+                    </td>\
+                    <td>\
+                    "));
+            try!(markup::short(file, &trait_item.docs.parts));
+            try!(file.write_all(b"\
+                    </td>\
+                </tr>\
+                "));
+
+            self.path.pop();
+
+            num_impls = 1;
         }
 
         try!(file.write_all(b"\

@@ -27,6 +27,7 @@ mod struct_;
 mod type_;
 mod module;
 mod method;
+mod macro_;
 
 pub fn create(krate: Crate) -> Result {
     let docs = &krate.item.docs;
