@@ -4,7 +4,7 @@
 
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::{mem};
-use lrs::vec::{SVec, Vec};
+use lrs::vec::{Vec};
 use lrs::iter::{Iterator, IntoIterator};
 use lrs::rc::{Arc};
 
@@ -17,7 +17,7 @@ fn hash(d: DefId) -> u64 {
 }
 
 pub struct ItemMap {
-    buckets: SVec<SVec<(DefId, Arc<ItemData>)>>,
+    buckets: Vec<Vec<(DefId, Arc<ItemData>)>>,
     count: usize,
 }
 
@@ -41,7 +41,7 @@ impl ItemMap {
         for element in &*self {
             let bucket = (hash(element.0) % new_size as u64) as usize;
             try!(map.buckets[bucket].reserve(1));
-            map.buckets[bucket].push((element.0, element.1.new_ref()));
+            map.buckets[bucket].push((element.0, element.1.add_ref()));
         }
         mem::replace(self, map);
         Ok(())
@@ -61,7 +61,7 @@ impl ItemMap {
         let bucket = (hash(id) % self.buckets.len() as u64) as usize;
         for &(bid, ref item) in &self.buckets[bucket] {
             if bid == id {
-                return Some(item.new_ref());
+                return Some(item.add_ref());
             }
         }
         None

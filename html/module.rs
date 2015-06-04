@@ -26,6 +26,10 @@ impl Formatter {
         try!(self.module_statics(&mut file, module));
         try!(self.module_macros(&mut file, module));
 
+        try!(markup::remarks(&mut file, &docs.parts));
+        try!(markup::examples(&mut file, &docs.parts));
+        try!(markup::see_also(&mut file, &docs.parts));
+
         try!(self.foot(&mut file));
 
         try!(try!(self.file()).write_all(&file));
@@ -46,8 +50,8 @@ impl Formatter {
             return Ok(());
         }
 
-        sub_mods.sort_by(|&(m1,_), &(m2,_)| m1.name.as_ref().unwrap().as_ref()
-                                    .cmp(m2.name.as_ref().unwrap().as_ref()));
+        sub_mods.sort_by(|&(m1,_), &(m2,_)| m1.name.as_ref().unwrap()
+                                       .cmp(m2.name.as_ref().unwrap()));
 
         try!(file.write_all(b"\
             <h2>Sub-modules</h2>\
@@ -113,8 +117,8 @@ impl Formatter {
             return Ok(());
         }
 
-        types.sort_by(|&(m1, _, _), &(m2, _, _)| m1.name.as_ref().unwrap().as_ref()
-                                            .cmp(m2.name.as_ref().unwrap().as_ref()));
+        types.sort_by(|&(m1, _, _), &(m2, _, _)| m1.name.as_ref().unwrap()
+                                            .cmp(m2.name.as_ref().unwrap()));
 
         try!(file.write_all(b"\
             <h2>Types</h2>\
@@ -185,8 +189,8 @@ impl Formatter {
             return Ok(());
         }
 
-        functions.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap().as_ref()
-                                          .cmp(f2.name.as_ref().unwrap().as_ref()));
+        functions.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap()
+                                          .cmp(f2.name.as_ref().unwrap()));
 
         try!(file.write_all(b"\
             <h2>Functions</h2>\
@@ -249,8 +253,8 @@ impl Formatter {
             return Ok(());
         }
 
-        constants.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap().as_ref()
-                                          .cmp(f2.name.as_ref().unwrap().as_ref()));
+        constants.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap()
+                                          .cmp(f2.name.as_ref().unwrap()));
 
         try!(file.write_all(b"\
             <h2>Constants</h2>\
@@ -313,8 +317,8 @@ impl Formatter {
             return Ok(());
         }
 
-        statics.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap().as_ref()
-                                        .cmp(f2.name.as_ref().unwrap().as_ref()));
+        statics.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap()
+                                        .cmp(f2.name.as_ref().unwrap()));
 
         try!(file.write_all(b"\
             <h2>Statics</h2>\
@@ -380,8 +384,8 @@ impl Formatter {
             return Ok(());
         }
 
-        macros.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap().as_ref()
-                                        .cmp(f2.name.as_ref().unwrap().as_ref()));
+        macros.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap()
+                                       .cmp(f2.name.as_ref().unwrap()));
 
         try!(file.write_all(b"\
             <h2>Macros</h2>\

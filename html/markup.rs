@@ -204,7 +204,7 @@ pub fn link<W: Write>(mut w: &mut W, link: &ByteString,
                       txt: &Option<Box<TextBlock>>) -> Result {
     try!(w.write_all(b"<a href=\""));
 
-    if link.as_ref().starts_with(b"man:") {
+    if link.starts_with("man:") {
         if let Some(p) = memchr(link.as_ref(), b'(') {
             try!(write!(w,
                 "http://man7.org/linux/man-pages/man{}/{}.{}.html\">",
@@ -218,7 +218,7 @@ pub fn link<W: Write>(mut w: &mut W, link: &ByteString,
         }
     }
 
-    if link.as_ref().starts_with(b"lrs") {
+    if link.starts_with("lrs") {
         try!(write!(w, "./{}.html\">", link));
         match *txt {
             Some(ref txt) => { try!(text_block(w, txt)); }
@@ -260,6 +260,11 @@ pub fn block_data<W: Write>(mut w: &mut W, data: &BlockData,
                 }
             }
         }
+    }
+
+    let is_quote = data.attributes.find(|a| a.name.trim() == "quote").is_some();
+    if is_quote {
+        try!(w.write_all(b"<blockquote>"));
     }
 
     match data.inner {
@@ -311,6 +316,10 @@ pub fn block_data<W: Write>(mut w: &mut W, data: &BlockData,
             try!(w.write_all(b"</table>"));
         },
     };
+
+    if is_quote {
+        try!(w.write_all(b"</blockquote>"));
+    }
 
     Ok(())
 }

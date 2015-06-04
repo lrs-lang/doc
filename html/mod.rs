@@ -6,9 +6,13 @@
 
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::io::{Write};
-use lrs::file::{self, File};
-use lrs::string::{ByteString, SByteString};
-use lrs::vec::{SVec};
+use lrs::file::{self, File, Mode};
+use lrs::file::flags::{
+    FILE_ONLY_DIRECTORY, FILE_PATH, FILE_WRITE_ONLY, FILE_TRUNCATE, FILE_CREATE,
+};
+use lrs::file::mode::{MODE_DIRECTORY, MODE_FILE};
+use lrs::string::{ByteString};
+use lrs::vec::{Vec};
 use lrs::iter::{IteratorExt};
 
 use tree::*;
@@ -40,11 +44,8 @@ pub fn create(krate: Crate) -> Result {
     let mut parts = try!(Vec::with_capacity(1));
     parts.push(ByteString::from_vec(try!(b"lrs".to_owned())));
 
-    let _ = file::create_dir("doc", file::Mode::new_directory());
-    let mut flags = file::Flags::new();
-    flags.set_only_directory(true);
-    flags.set_path_fd(true);
-    let dir = try!(File::open("doc", flags));
+    let _ = file::create_dir("doc", MODE_DIRECTORY);
+    let dir = try!(File::open("doc", FILE_ONLY_DIRECTORY | FILE_PATH, Mode(0)));
 
     let mut formatter = Formatter { 
         path: parts,
@@ -56,15 +57,15 @@ pub fn create(krate: Crate) -> Result {
 
 mod path {
     #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-    use lrs::string::{ByteString, SByteString};
+    use lrs::string::{ByteString};
 
-    pub fn path(parts: &[SByteString]) -> Result<SByteString> {
+    pub fn path(parts: &[ByteString]) -> Result<ByteString> {
         let mut buf = try!(title(parts)).unwrap();
         try!(buf.push_all(b".html"));
         Ok(ByteString::from_vec(buf))
     }
 
-    pub fn title(parts: &[SByteString]) -> Result<SByteString> {
+    pub fn title(parts: &[ByteString]) -> Result<ByteString> {
         if parts.len() == 0 {
             return Ok(ByteString::new());
         }
@@ -80,17 +81,14 @@ mod path {
 
 
 struct Formatter {
-    path: SVec<SByteString>,
+    path: Vec<ByteString>,
     dir: File,
 }
 
 impl Formatter {
     fn file(&self) -> Result<File> {
-        let mut flags = file::Flags::new();
-        flags.set_writable(true);
-        flags.set_truncate(true);
-        flags.enable_create(file::Mode::new_file());
-        self.dir.rel_open(&try!(path::path(&self.path)), flags)
+        let flags = FILE_WRITE_ONLY | FILE_TRUNCATE | FILE_CREATE;
+        self.dir.rel_open(&try!(path::path(&self.path)), flags, MODE_FILE)
     }
 
     fn head<W: Write>(&self, file: &mut W, prefix: &str) -> Result {
@@ -172,7 +170,7 @@ fn write_ty_param_bound<W: Write>(file: &mut W, bound: &TyParamBound) -> Result 
     Ok(())
 }
 
-fn write_angle_params<W: Write>(file: &mut W, lts: &[SByteString], types: &[Type],
+fn write_angle_params<W: Write>(file: &mut W, lts: &[ByteString], types: &[Type],
                                 bindings: &[TypeBinding]) -> Result {
     let mut first = true;
     for lt in lts {

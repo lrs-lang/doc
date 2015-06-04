@@ -49,8 +49,8 @@ impl Formatter {
             return Ok(());
         }
 
-        variants.sort_by(|&(i1, _), &(i2, _)| i1.name.as_ref().unwrap().as_ref()
-                                         .cmp(i2.name.as_ref().unwrap().as_ref()));
+        variants.sort_by(|&(i1, _), &(i2, _)| i1.name.as_ref().unwrap()
+                                         .cmp(i2.name.as_ref().unwrap()));
 
         try!(file.write_all(b"\
             <h2>Variants</h2>\
@@ -110,8 +110,8 @@ fn syntax<W: Write>(file: &mut W, item: &ItemData, enum_: &Enum) -> Result {
         }
     }
 
-    variants.sort_by(|&(i1, _), &(i2, _)| i1.name.as_ref().unwrap().as_ref()
-                                     .cmp(i2.name.as_ref().unwrap().as_ref()));
+    variants.sort_by(|&(i1, _), &(i2, _)| i1.name.as_ref().unwrap()
+                                     .cmp(i2.name.as_ref().unwrap()));
 
     try!(file.write_all(b"\
         <h2>Syntax</h2>\

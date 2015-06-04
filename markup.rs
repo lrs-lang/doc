@@ -79,12 +79,12 @@
 use lrs::{mem};
 use lrs::bx::{Box};
 use lrs::util::{memchr};
-use lrs::string::{ByteString, SByteString};
-use lrs::vec::{SVec};
+use lrs::string::{ByteString};
+use lrs::vec::{Vec};
 use lrs::io::{BufRead};
 
 pub struct Document {
-    pub parts: SVec<Part>,
+    pub parts: Vec<Part>,
 }
 
 pub enum Part {
@@ -93,20 +93,20 @@ pub enum Part {
 }
 
 pub struct BlockData {
-    pub attributes: SVec<Attribute>,
+    pub attributes: Vec<Attribute>,
     pub inner: Block,
 }
 
 pub struct Attribute {
-    pub name: SByteString,
-    pub args: Option<SByteString>,
+    pub name: ByteString,
+    pub args: Option<ByteString>,
 }
 
 pub enum Block {
-    Grouped(SVec<BlockData>),
-    Code(SByteString),
-    List(SVec<ListEl>),
-    Table(SVec<TableRow>),
+    Grouped(Vec<BlockData>),
+    Code(ByteString),
+    List(Vec<ListEl>),
+    Table(Vec<TableRow>),
     Text(TextBlock),
 }
 
@@ -116,7 +116,7 @@ pub enum ListEl {
 }
 
 pub struct TableRow {
-    pub cols: SVec<TableCol>,
+    pub cols: Vec<TableCol>,
 }
 
 pub enum TableCol {
@@ -130,9 +130,9 @@ pub struct TextBlock {
 }
 
 pub enum Text {
-    Raw(SByteString),
-    Nested(SVec<TextBlock>),
-    Link(SByteString, Option<Box<TextBlock>>),
+    Raw(ByteString),
+    Nested(Vec<TextBlock>),
+    Link(ByteString, Option<Box<TextBlock>>),
 }
 
 pub enum TextAttr {
@@ -161,10 +161,10 @@ pub fn parse(input: &[u8]) -> Result<Document> {
 struct DocParser<R: BufRead> {
     r: R,
     eof: bool,
-    next: Option<SVec<u8>>,
+    next: Option<Vec<u8>>,
 
-    parts: SVec<Part>,
-    vars: SVec<(SVec<u8>, SVec<u8>)>,
+    parts: Vec<Part>,
+    vars: Vec<(Vec<u8>, Vec<u8>)>,
 }
 
 impl<R: BufRead> DocParser<R> {
@@ -175,7 +175,7 @@ impl<R: BufRead> DocParser<R> {
         Ok(self.next.as_ref().unwrap())
     }
 
-    fn next_line(&mut self) -> Result<SVec<u8>> {
+    fn next_line(&mut self) -> Result<Vec<u8>> {
         if self.next.is_some() {
             return Ok(self.next.take().unwrap());
         }
@@ -301,7 +301,7 @@ impl<R: BufRead> DocParser<R> {
         }
     }
 
-    fn attributes(&mut self) -> Result<SVec<Attribute>> {
+    fn attributes(&mut self) -> Result<Vec<Attribute>> {
         let mut vec = Vec::new();
         while !self.eof {
             if let Some(a) = try!(self.attribute()) {
@@ -578,17 +578,17 @@ impl<R: BufRead> DocParser<R> {
 
 struct TextParser<'a> {
     text: &'a [u8],
-    current: Option<SVec<u8>>,
-    past: SVec<TextBlock>,
+    current: Option<Vec<u8>>,
+    past: Vec<TextBlock>,
 }
 
 impl<'a> TextParser<'a> {
-    fn all_in_one(text: &[u8], vars: &[(SVec<u8>, SVec<u8>)]) -> Result<TextBlock> {
+    fn all_in_one(text: &[u8], vars: &[(Vec<u8>, Vec<u8>)]) -> Result<TextBlock> {
         let vec = try!(TextParser::subst(text, vars));
         TextParser::parse(&vec)
     }
 
-    fn subst(text: &[u8], vars: &[(SVec<u8>, SVec<u8>)]) -> Result<SVec<u8>> {
+    fn subst(text: &[u8], vars: &[(Vec<u8>, Vec<u8>)]) -> Result<Vec<u8>> {
         let mut text: Vec<_> = try!(text.to_owned());
         let mut next = try!(Vec::with_capacity(text.len()));
         loop {
@@ -806,7 +806,7 @@ impl<'a> TextParser<'a> {
 
         let link = ByteString::from_vec(try!(self.text[b"link:".len()..i].to_owned()));
         let link_text = match link_text {
-            Some(t) => Some(try_box!(try!(TextParser::parse(&t)))),
+            Some(t) => Some(try!(Box::new()).set(try!(TextParser::parse(&t)))),
             _ => None,
         };
 

@@ -47,8 +47,8 @@ impl Formatter {
             return Ok(());
         }
 
-        methods.sort_by(|&(_, i1, _), &(_, i2, _)| i1.name.as_ref().unwrap().as_ref()
-                                              .cmp(i2.name.as_ref().unwrap().as_ref()));
+        methods.sort_by(|&(_, i1, _), &(_, i2, _)| i1.name.as_ref().unwrap()
+                                              .cmp(i2.name.as_ref().unwrap()));
 
         try!(file.write_all(b"\
             <h2>Static methods</h2>\
@@ -125,8 +125,8 @@ impl Formatter {
             return Ok(());
         }
 
-        methods.sort_by(|&(_, i1, _), &(_, i2, _)| i1.name.as_ref().unwrap().as_ref()
-                                              .cmp(i2.name.as_ref().unwrap().as_ref()));
+        methods.sort_by(|&(_, i1, _), &(_, i2, _)| i1.name.as_ref().unwrap()
+                                              .cmp(i2.name.as_ref().unwrap()));
 
         try!(file.write_all(b"\
             <h2>Methods</h2>\
@@ -205,7 +205,7 @@ impl Formatter {
                         let borrow = path.item.borrow();
                         if let Some(ref trait_item) = *borrow {
                             try!(impls.reserve(1));
-                            impls.push((impl_item, impl_, trait_item.new_ref(), trait_));
+                            impls.push((impl_item, impl_, trait_item.add_ref(), trait_));
                         }
                     }
                 }
@@ -216,8 +216,8 @@ impl Formatter {
             return Ok(());
         }
 
-        impls.sort_by(|&(_, _, ref t1, _), &(_, _, ref t2, _)| t1.name.as_ref().unwrap().as_ref()
-                                                          .cmp(t2.name.as_ref().unwrap().as_ref()));
+        impls.sort_by(|&(_, _, ref t1, _), &(_, _, ref t2, _)| t1.name.as_ref().unwrap()
+                                                          .cmp(t2.name.as_ref().unwrap()));
 
         try!(file.write_all(b"\
             <h2>Trait implementations</h2>\

@@ -4,7 +4,7 @@
 
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::rc::{Arc};
-use lrs::vec::{SVec};
+use lrs::vec::{Vec};
 use tree::{self, Walker, ItemData, ResolvedPath, Crate, Impl, Type, Item};
 use hashmap::{ItemMap};
 
@@ -23,19 +23,19 @@ struct CollectItems<'a> {
 
 impl<'a> Walker for CollectItems<'a> {
     fn walk_item_data(&mut self, val: &Arc<ItemData>) {
-        self.map.add(val.node, val.new_ref());
+        self.map.add(val.node, val.add_ref());
         tree::walk_item_data(self, val);
     }
 }
 
 struct AddParents {
-    parents: SVec<Arc<ItemData>>,
+    parents: Vec<Arc<ItemData>>,
 }
 
 impl Walker for AddParents {
     fn walk_item_data(&mut self, val: &Arc<ItemData>) {
-        *val.parent.borrow_mut() = self.parents.last().map(|l| l.new_ref());
-        self.parents.push(val.new_ref());
+        *val.parent.borrow_mut() = self.parents.last().map(|l| l.add_ref());
+        self.parents.push(val.add_ref());
         tree::walk_item_data(self, val);
         self.parents.pop();
     }
@@ -59,7 +59,7 @@ impl Walker for CollectImpls {
         if let Item::Impl(ref i) = val.inner {
             if let Type::ResolvedPath(ref r) = i.for_ {
                 if let Some(ref i) = *r.item.borrow() {
-                    i.impls.borrow_mut().push(val.new_ref());
+                    i.impls.borrow_mut().push(val.add_ref());
                 }
             }
         }

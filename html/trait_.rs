@@ -5,7 +5,7 @@
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::io::{Write};
 use lrs::rc::{Arc};
-use lrs::vec::{SVec};
+use lrs::vec::{Vec};
 
 use html::{self, Formatter, markup, angle_generics, where_predicates, write_ty_param_bounds, write_raw_type, path};
 use markup::{Document};
@@ -26,8 +26,8 @@ impl Formatter {
         try!(assoc_types(&mut file, &mut assocs));
 
         try!(required.push_all(&provided));
-        required.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap().as_ref()
-                                         .cmp(f2.name.as_ref().unwrap().as_ref()));
+        required.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap()
+                                         .cmp(f2.name.as_ref().unwrap()));
 
         try!(self.trait_methods(&mut file, &required));
         try!(self.type_trait_impls(&mut file, item));
@@ -236,9 +236,9 @@ fn assoc_types<W: Write>(file: &mut W,
 }
 
 
-type Res<'a> = (SVec<(&'a Arc<ItemData>, &'a AssocType)>,
-                SVec<(&'a Arc<ItemData>, &'a Method)>,
-                SVec<(&'a Arc<ItemData>, &'a Method)>);
+type Res<'a> = (Vec<(&'a Arc<ItemData>, &'a AssocType)>,
+                Vec<(&'a Arc<ItemData>, &'a Method)>,
+                Vec<(&'a Arc<ItemData>, &'a Method)>);
             
 
 fn collect_parts(trait_: &Trait) -> Result<Res> {
@@ -264,12 +264,12 @@ fn collect_parts(trait_: &Trait) -> Result<Res> {
         }
     }
 
-    assoc.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap().as_ref()
-                                  .cmp(f2.name.as_ref().unwrap().as_ref()));
-    decl.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap().as_ref()
-                                 .cmp(f2.name.as_ref().unwrap().as_ref()));
-    method.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap().as_ref()
-                                   .cmp(f2.name.as_ref().unwrap().as_ref()));
+    assoc.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap()
+                                  .cmp(f2.name.as_ref().unwrap()));
+    decl.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap()
+                                 .cmp(f2.name.as_ref().unwrap()));
+    method.sort_by(|&(f1, _), &(f2, _)| f1.name.as_ref().unwrap()
+                                   .cmp(f2.name.as_ref().unwrap()));
 
     Ok((assoc, decl, method))
 }

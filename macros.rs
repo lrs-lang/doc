@@ -21,15 +21,6 @@ macro_rules! tryerr {
     }};
 }
 
-macro_rules! try_box {
-    ($e:expr) => {
-        match Box::new($e) {
-            Ok(e) => e,
-            Err((_, e)) => return Err(e),
-        }
-    }
-}
-
 macro_rules! warning {
     ($fmt:expr) => { warning!(concat!($fmt, "{}"), "") };
     ($fmt:expr, $($arg:tt)*) => {{

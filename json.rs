@@ -9,8 +9,8 @@
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::error::{Errno, InvalidArgument};
 use lrs::{mem};
-use lrs::vec::{SVec};
-use lrs::string::{SByteString};
+use lrs::vec::{Vec};
+use lrs::string::{ByteString};
 use lrs::io::{BufRead};
 use lrs::parse::{Parsable};
 
@@ -24,11 +24,11 @@ macro_rules! error {
 
 const ERR: Errno = InvalidArgument;
 
-pub type Object = SVec<(SByteString, Value)>;
-pub type Array = SVec<Value>;
+pub type Object = Vec<(ByteString, Value)>;
+pub type Array = Vec<Value>;
 pub type Slice = [Value];
 pub enum Value {
-    String(SByteString),
+    String(ByteString),
     Integer(i64),
     Object(Object),
     Array(Array),
@@ -94,7 +94,7 @@ fn object(data: &mut &[u8]) -> Result<Object> {
     Ok(pairs)
 }
 
-fn string(data: &mut &[u8]) -> Result<SByteString> {
+fn string(data: &mut &[u8]) -> Result<ByteString> {
     whitespace(data);
     if data.len() == 0 || data[0] != b'"' { error!("String is empty or doesn't start with \""); }
     data.consume(1);
@@ -148,7 +148,7 @@ fn string(data: &mut &[u8]) -> Result<SByteString> {
     }
 
     data.consume(1);
-    Ok(SByteString::from_vec(string))
+    Ok(ByteString::from_vec(string))
 }
 
 fn integer(data: &mut &[u8]) -> Result<i64> {

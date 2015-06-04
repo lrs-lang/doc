@@ -6,11 +6,11 @@
 
 #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
 use lrs::error::{self, InvalidArgument};
-use lrs::vec::{SVec};
-use lrs::string::{SByteString, AsByteStr};
+use lrs::vec::{Vec};
+use lrs::string::{ByteString, AsByteStr};
 use lrs::bx::{Box};
 use lrs::rc::{Arc};
-use lrs::cell::{RefCell};
+use lrs::share::{RefCell};
 
 use json::{Value};
 use json::Slice as JSlice;
@@ -48,7 +48,7 @@ fn krate(json: &Value) -> Result<Crate> {
     Ok(Crate { item: module })
 }
 
-fn item_datas(json: &Value) -> Result<SVec<Arc<ItemData>>> {
+fn item_datas(json: &Value) -> Result<Vec<Arc<ItemData>>> {
     let array = try!(collect_array(json, "?", "items"));
     let mut vec = try!(Vec::with_capacity(array.len()));
     for l in array {
@@ -87,7 +87,7 @@ fn item_data(json: &Value) -> Result<Arc<ItemData>> {
     }
     let docs = try!(markup::parse(&doc));
 
-    let item = Arc::new(ItemData {
+    let item = try!(Arc::new()).set(ItemData {
         name: name,
         attrs: attrs,
         docs: docs,
@@ -96,12 +96,12 @@ fn item_data(json: &Value) -> Result<Arc<ItemData>> {
         node: node,
         parent: RefCell::new(None),
         impls: RefCell::new(Vec::new()),
-    }).unwrap();
+    });
 
     Ok(item)
 }
 
-fn attributes(json: &Value) -> Result<SVec<Attribute>> {
+fn attributes(json: &Value) -> Result<Vec<Attribute>> {
     let array = try!(collect_array(json, "?", "attributes"));
     let mut attributes = try!(Vec::with_capacity(array.len()));
     for val in array {
@@ -113,7 +113,8 @@ fn attributes(json: &Value) -> Result<SVec<Attribute>> {
 fn attribute(json: &Value) -> Result<Attribute> {
     let (variant, fields) = try!(collect_enum(json, "Attribute"));
 
-    match variant.as_ref() {
+    let bytes: &[u8] = variant.as_ref();
+    match bytes {
         b"Word" => {
             if fields.len() != 1 { error!("word attribute has unexpected structure") }
             let string = try!(collect_string(&fields[0], "word attribute", "fields[0]"));
@@ -141,7 +142,9 @@ fn attribute(json: &Value) -> Result<Attribute> {
 
 fn visibility(json: &Value) -> Result<bool> {
     let s = try!(collect_string(json, "?", "visibility"));
-    match s.as_ref() {
+
+    let bytes: &[u8] = s.as_ref();
+    match bytes {
         b"Public" => Ok(true),
         b"Inherited" => Ok(false),
         _ => error!("visibility contains unexpected value: {:?}", s),
@@ -159,7 +162,8 @@ fn def_id(json: &Value) -> Result<DefId> {
 fn item(json: &Value) -> Result<Item> {
     let (variant, fields) = try!(collect_enum(json, "ItemEnum"));
 
-    match variant.as_ref() {
+    let bytes: &[u8] = variant.as_ref();
+    match bytes {
         b"ImportItem"          => item_import(fields),
         b"StructItem"          => item_struct(fields),
         b"EnumItem"            => item_enum(fields),
@@ -216,7 +220,7 @@ fn path(json: &Value) -> Result<Path> {
     Ok(Path { global: global, segments: segments })
 }
 
-fn path_segments(json: &Value) -> Result<SVec<PathSegment>> {
+fn path_segments(json: &Value) -> Result<Vec<PathSegment>> {
     let array = try!(collect_array(json, "path", "segments"));
     let mut vec = try!(Vec::with_capacity(array.len()));
     for seg in array {
@@ -238,7 +242,9 @@ fn path_segment(json: &Value) -> Result<PathSegment> {
 
 fn path_params(params: &Value) -> Result<PathParameters> {
     let (variant, fields) = try!(collect_enum(params, "PathParameters"));
-    match variant.as_ref() {
+
+    let bytes: &[u8] = variant.as_ref();
+    match bytes {
         b"AngleBracketed" => {
             if fields.len() != 3 { error!("angle bracketed path params with {} fields",
                                            fields.len()); }
@@ -267,7 +273,7 @@ fn path_params(params: &Value) -> Result<PathParameters> {
     }
 }
 
-fn lifetimes(json: &Value) -> Result<SVec<SByteString>> {
+fn lifetimes(json: &Value) -> Result<Vec<ByteString>> {
     let array = try!(collect_array(json, "?", "lifetimes"));
     let mut vec = try!(Vec::with_capacity(array.len()));
     for l in array {
@@ -276,7 +282,7 @@ fn lifetimes(json: &Value) -> Result<SVec<SByteString>> {
     Ok(vec)
 }
 
-fn lifetime(json: &Value) -> Result<SByteString> {
+fn lifetime(json: &Value) -> Result<ByteString> {
     let mut fields = [("_field0", None)];
     try!(collect_object(json, &mut fields, "Lifetime"));
     let s = try!(collect_string(fields[0].1.unwrap(), "Lifetime", "_field0"));
@@ -284,7 +290,7 @@ fn lifetime(json: &Value) -> Result<SByteString> {
     Ok(s)
 }
 
-fn types(json: &Value) -> Result<SVec<Type>> {
+fn types(json: &Value) -> Result<Vec<Type>> {
     let array = try!(collect_array(json, "?", "types"));
     let mut vec = try!(Vec::with_capacity(array.len()));
     for l in array {
@@ -295,7 +301,9 @@ fn types(json: &Value) -> Result<SVec<Type>> {
 
 fn type_(json: &Value) -> Result<Type> {
     let (variant, fields) = try!(collect_enum(json, "type"));
-    match variant.as_ref() {
+
+    let bytes: &[u8] = variant.as_ref();
+    match bytes {
         b"ResolvedPath" => type_resolved_path(fields),
         b"Generic"      => type_generic(fields),
         b"Primitive"    => type_primitive(fields),
@@ -314,7 +322,7 @@ fn type_(json: &Value) -> Result<Type> {
 }
 
 fn type_resolved_path(fields: &JSlice) -> Result<Type> {
-    if fields.len() != 3 { error!("resolved path type with {} fields", fields.len()); }
+    if fields.len() != 4 { error!("resolved path type with {} fields", fields.len()); }
     let rp = ResolvedPath {
         path: try!(path(&fields[0])),
         params: match fields[1] {
@@ -322,12 +330,13 @@ fn type_resolved_path(fields: &JSlice) -> Result<Type> {
             _ => Some(try!(ty_param_bounds(&fields[1]))),
         },
         def_id: try!(def_id(&fields[2])),
+        is_generic: try!(collect_bool(&fields[3], "ResolvedPath", "is_generic")),
         item: RefCell::new(None),
     };
     Ok(Type::ResolvedPath(rp))
 }
 
-fn ty_param_bounds(json: &Value) -> Result<SVec<TyParamBound>> {
+fn ty_param_bounds(json: &Value) -> Result<Vec<TyParamBound>> {
     let array = try!(collect_array(json, "?", "ty_param_bounds"));
     let mut vec = try!(Vec::with_capacity(array.len()));
     for l in array {
@@ -338,7 +347,9 @@ fn ty_param_bounds(json: &Value) -> Result<SVec<TyParamBound>> {
 
 fn ty_param_bound(json: &Value) -> Result<TyParamBound> {
     let (variant, fields) = try!(collect_enum(json, "ty_param_bound"));
-    match variant.as_ref() {
+
+    let bytes: &[u8] = variant.as_ref();
+    match bytes {
         b"RegionBound" => {
             if fields.len() != 1 { error!("region bound with {} fields", fields.len()) }
             let lt = try!(lifetime(&fields[0]));
@@ -358,7 +369,8 @@ fn ty_param_bound(json: &Value) -> Result<TyParamBound> {
 
 fn trait_bound_modifier(json: &Value) -> Result<bool> {
     let (variant, _) = try!(collect_enum(json, "TraitBoundModifier"));
-    match variant.as_ref() {
+    let bytes: &[u8] = variant.as_ref();
+    match bytes {
         b"None" => Ok(false),
         b"Maybe" => Ok(true),
         _ => error!("Unexpected TraitBoundModifier variant: {:?}", variant),
@@ -387,7 +399,9 @@ fn type_primitive(fields: &JSlice) -> Result<Type> {
 
 fn primitive(json: &Value) -> Result<Primitive> {
     let s = try!(collect_string(json, "?", "primitive"));
-    match s.as_ref() {
+
+    let bytes: &[u8] = s.as_ref();
+    match bytes {
         b"Isize"               => Ok(Primitive::Isize),
         b"I8"                  => Ok(Primitive::I8),
         b"I16"                 => Ok(Primitive::I16),
@@ -432,7 +446,7 @@ fn type_bare_function(fields: &JSlice) -> Result<Type> {
         abi: try!(abi.clone()),
     };
 
-    Ok(Type::BareFunction(BareFunction { decl: try_box!(bare_decl) }))
+    Ok(Type::BareFunction(BareFunction { decl: try!(Box::new()).set(bare_decl) }))
 }
 
 fn type_tuple(fields: &JSlice) -> Result<Type> {
@@ -448,14 +462,14 @@ fn type_tuple(fields: &JSlice) -> Result<Type> {
 fn type_slice(fields: &JSlice) -> Result<Type> {
     if fields.len() != 1 { error!("slice type with {} fields", fields.len()); }
     let ty = try!(type_(&fields[0]));
-    Ok(Type::Slice(Slice { ty: try_box!(ty) }))
+    Ok(Type::Slice(Slice { ty: try!(Box::new()).set(ty) }))
 }
 
 fn type_array(fields: &JSlice) -> Result<Type> {
     if fields.len() != 2 { error!("array type with {} fields", fields.len()); }
     let ty = try!(type_(&fields[0]));
     let len = try!(collect_string(&fields[1], "array type", "unnamed"));
-    Ok(Type::Array(Array { ty: try_box!(ty), initializer: try!(len.clone()) }))
+    Ok(Type::Array(Array { ty: try!(Box::new()).set(ty), initializer: try!(len.clone()) }))
 }
 
 fn type_bottom(fields: &JSlice) -> Result<Type> {
@@ -467,7 +481,7 @@ fn type_pointer(fields: &JSlice) -> Result<Type> {
     if fields.len() != 2 { error!("bottom type with {} fields", fields.len()); }
     let mutable = try!(mutability(&fields[0]));
     let ty = try!(type_(&fields[1]));
-    Ok(Type::Pointer(Pointer { mutable: mutable, ty: try_box!(ty) }))
+    Ok(Type::Pointer(Pointer { mutable: mutable, ty: try!(Box::new()).set(ty) }))
 }
 
 fn type_ref(fields: &JSlice) -> Result<Type> {
@@ -478,15 +492,15 @@ fn type_ref(fields: &JSlice) -> Result<Type> {
     };
     let mutable = try!(mutability(&fields[1]));
     let ty = try!(type_(&fields[2]));
-    Ok(Type::Ref(Ref { lifetime: lifetime, mutable: mutable, ty: try_box!(ty) }))
+    Ok(Type::Ref(Ref { lifetime: lifetime, mutable: mutable, ty: try!(Box::new()).set(ty) }))
 }
 
 fn type_ufcs_path(fields: &JSlice) -> Result<Type> {
     if fields.len() != 3 { error!("ufcs type with {} fields", fields.len()); }
     let name = try!(collect_string(&fields[0], "ufcs type", "name"));
     let up = UfcsPath {
-        self_ty: try_box!(try!(type_(&fields[1]))),
-        trait_: try_box!(try!(type_(&fields[2]))),
+        self_ty: try!(Box::new()).set(try!(type_(&fields[1]))),
+        trait_: try!(Box::new()).set(try!(type_(&fields[2]))),
         target: try!(name.clone()),
     };
     Ok(Type::UfcsPath(up))
@@ -503,7 +517,7 @@ fn type_hklt_bound(fields: &JSlice) -> Result<Type> {
     Ok(Type::HkltBound(HkltBound { bounds: bounds }))
 }
 
-fn type_bindings(json: &Value) -> Result<SVec<TypeBinding>> {
+fn type_bindings(json: &Value) -> Result<Vec<TypeBinding>> {
     let array = try!(collect_array(json, "?", "type_bindings"));
     let mut vec = try!(Vec::with_capacity(array.len()));
     for l in array {
@@ -598,8 +612,9 @@ fn module(json: &Value) -> Result<Module> {
 }
 
 fn item_typedef(fields: &JSlice) -> Result<Item> {
-    if fields.len() != 1 { error!("typedef item with {} fields", fields.len()); }
-    let typedef = try!(typedef(&fields[0]));
+    if fields.len() != 2 { error!("typedef item with {} fields", fields.len()); }
+    let mut typedef = try!(typedef(&fields[0]));
+    typedef.is_assoc = try!(collect_bool(&fields[1], "TypedefItem", "fields[1]"));
     Ok(Item::Typedef(typedef))
 }
 
@@ -608,7 +623,7 @@ fn typedef(json: &Value) -> Result<Typedef> {
     try!(collect_object(json, &mut fields, "Typedef"));
     let type_ = try!(type_(fields[0].1.unwrap()));
     let generics = try!(generics(fields[1].1.unwrap()));
-    Ok(Typedef { type_: type_, generics: generics })
+    Ok(Typedef { type_: type_, generics: generics, is_assoc: false, })
 }
 
 fn item_static(fields: &JSlice) -> Result<Item> {
@@ -737,7 +752,8 @@ fn item_struct_field(fields: &JSlice) -> Result<Item> {
 
 fn struct_field(json: &Value) -> Result<StructField> {
     let (variant, fields) = try!(collect_enum(json, "StructField"));
-    match variant.as_ref() {
+    let bytes: &[u8] = variant.as_ref();
+    match bytes {
         b"HiddenStructField" => {
             if fields.len() != 0 { error!("HiddenStructField with {} fields",
                                           fields.len()); }
@@ -768,7 +784,8 @@ fn variant(json: &Value) -> Result<Variant> {
 
 fn variant_kind(json: &Value) -> Result<VariantKind> {
     let (variant, fields) = try!(collect_enum(json, "VariantKind"));
-    match variant.as_ref() {
+    let bytes: &[u8] = variant.as_ref();
+    match bytes {
         b"CLikeVariant" => {
             if fields.len() != 0 { error!("CLikeVariant with {} fields", fields.len()); }
             Ok(VariantKind::CLike)
@@ -805,7 +822,8 @@ fn variant_struct(json: &Value) -> Result<VariantStruct> {
 
 fn struct_type(json: &Value) -> Result<StructType> {
     let s = try!(collect_string(json, "?", "struct_type"));
-    match s.as_ref() {
+    let bytes: &[u8] = s.as_ref();
+    match bytes {
         b"Plain" => Ok(StructType::Plain),
         b"Tuple" | b"Newtype" => Ok(StructType::Tuple),
         b"Unit" => Ok(StructType::Unit),
@@ -887,7 +905,7 @@ fn generics(json: &Value) -> Result<Generics> {
     })
 }
 
-fn ty_params(json: &Value) -> Result<SVec<TyParam>> {
+fn ty_params(json: &Value) -> Result<Vec<TyParam>> {
     let array = try!(collect_array(json, "?", "ty_params"));
     let mut vec = try!(Vec::with_capacity(array.len()));
     for l in array {
@@ -913,7 +931,7 @@ fn ty_param(json: &Value) -> Result<TyParam> {
     })
 }
 
-fn where_predicates(json: &Value) -> Result<SVec<WherePredicate>> {
+fn where_predicates(json: &Value) -> Result<Vec<WherePredicate>> {
     let array = try!(collect_array(json, "?", "where_predicates"));
     let mut vec = try!(Vec::with_capacity(array.len()));
     for l in array {
@@ -924,7 +942,8 @@ fn where_predicates(json: &Value) -> Result<SVec<WherePredicate>> {
 
 fn where_predicate(json: &Value) -> Result<WherePredicate> {
     let (variant, fields) = try!(collect_enum(json, "WherePredicate"));
-    match variant.as_ref() {
+    let bytes: &[u8] = variant.as_ref();
+    match bytes {
         b"BoundPredicate" => {
             if fields.len() != 2 { error!("BoundPredicate with {} fields", fields.len()); }
             let bwp = BoundWherePredicate {
@@ -955,7 +974,8 @@ fn where_predicate(json: &Value) -> Result<WherePredicate> {
 
 fn abi(json: &Value) -> Result<Abi> {
     let s = try!(collect_string(json, "?", "abi"));
-    match s.as_ref() {
+    let bytes: &[u8] = s.as_ref();
+    match bytes {
         b"Rust"          => Ok(Abi::Rust),
         b"C"             => Ok(Abi::C),
         b"System"        => Ok(Abi::System),
@@ -977,7 +997,8 @@ fn fn_decl(json: &Value) -> Result<FnDecl> {
 
 fn func_ret_ty(json: &Value) -> Result<FuncRetTy> {
     let (variant, fields) = try!(collect_enum(json, "FuncRetTy"));
-    match variant.as_ref() {
+    let bytes: &[u8] = variant.as_ref();
+    match bytes {
         b"Return" => {
             if fields.len() != 1 { error!("FuncRetTy::Return with {} fields",
                                           fields.len()); }
@@ -998,7 +1019,8 @@ fn func_ret_ty(json: &Value) -> Result<FuncRetTy> {
 
 fn self_ty(json: &Value) -> Result<SelfTy> {
     let (variant, fields) = try!(collect_enum(json, "SelfTy"));
-    match variant.as_ref() {
+    let bytes: &[u8] = variant.as_ref();
+    match bytes {
         b"SelfStatic" => {
             if fields.len() != 0 { error!("SelfStatic with {} fields", fields.len()); }
             Ok(SelfTy::Static)
@@ -1035,7 +1057,7 @@ fn polarity(json: &Value) -> Result<bool> {
     Ok(s == "Negative")
 }
 
-fn arguments(json: &Value) -> Result<SVec<Argument>> {
+fn arguments(json: &Value) -> Result<Vec<Argument>> {
     let mut fields = [("values", None)];
     try!(collect_object(json, &mut fields, "Arguments"));
     let array = try!(collect_array(fields[0].1.unwrap(), "?", "arguments"));
@@ -1056,7 +1078,7 @@ fn argument(json: &Value) -> Result<Argument> {
     Ok(Argument { type_: ty, name: name, id: id as u64 })
 }
 
-fn collect_string<'a>(json: &'a Value, obj: &str, field: &str) -> Result<&'a SByteString> {
+fn collect_string<'a>(json: &'a Value, obj: &str, field: &str) -> Result<&'a ByteString> {
     match *json {
         Value::String(ref s) => Ok(s),
         _ => error!("field {} on {} is not a string", field, obj),
@@ -1108,7 +1130,7 @@ fn collect_bool<'a>(json: &'a Value, obj: &str, field: &str) -> Result<bool> {
     }
 }
 
-fn collect_enum<'a>(json: &'a Value, obj: &str) -> Result<(&'a SByteString, &'a JSlice)> {
+fn collect_enum<'a>(json: &'a Value, obj: &str) -> Result<(&'a ByteString, &'a JSlice)> {
     match *json {
         Value::String(ref s) => return Ok((s, &[])),
         _ => { },
