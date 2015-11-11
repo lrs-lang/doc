@@ -1,0 +1,22 @@
+= lrs_doc
+
+lrs_doc is the documentation generator of lrs.
+
+== The markup language
+
+:lang: https://github.com/lrs-lang/lib/blob/master/Documentation/adoc/markup.adoc
+
+The markup language used by lrs is described {lang}[here].
+
+== Usage
+
+:bau: https://github.com/lrs-lang/lib/blob/master/Documentation/adoc/building_and_using.adoc
+
+Please follow the instructions in the {bau}[Building and Using] guide.
+
+== Building
+
+:bau: https://github.com/lrs-lang/lib/blob/master/Documentation/adoc/building_and_using.adoc
+
+Assuming that you've already followed the {bau}[Building and Using] guide to
+this point, you can build lrs_doc with the provided makefile.
