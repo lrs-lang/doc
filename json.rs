@@ -6,13 +6,12 @@
 //!
 //! Not supported: Floating point numbers
 
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-use lrs::error::{Errno, InvalidArgument};
-use lrs::{mem};
-use lrs::vec::{Vec};
-use lrs::string::{ByteString};
-use lrs::io::{BufRead};
-use lrs::parse::{Parsable};
+use std::error::{Errno, InvalidArgument};
+use std::{mem};
+use std::vec::{Vec};
+use std::string::{ByteString};
+use std::io::{BufRead};
+use std::parse::{Parsable};
 
 macro_rules! error {
     ($fmt:expr) => { error!(concat!($fmt, "{}"), "") };

@@ -2,12 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-use lrs::rc::{Arc};
-use lrs::share::{RefCell};
-use lrs::vec::{Vec};
-use lrs::string::{ByteString};
-use lrs::bx::{Box};
+use std::rc::{Arc};
+use std::share::{RefCell};
+use std::vec::{Vec};
+use std::string::{ByteString};
+use std::bx::{Box};
 
 use markup::{Document};
 
@@ -118,7 +117,7 @@ pub struct Path {
 
 #[derive(Copy, Eq)]
 pub struct DefId {
-    pub node: u64,
+    pub index: u64,
     pub krate: u64,
 }
 

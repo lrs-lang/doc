@@ -2,10 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-use lrs::io::{Write};
-use lrs::rc::{Arc};
-use lrs::vec::{Vec};
+use std::io::{Write};
+use std::rc::{Arc};
+use std::vec::{Vec};
+use std::clone::{MaybeClone};
 
 use html::{self, Formatter, markup, angle_generics, where_predicates, write_ty_param_bounds, write_raw_type, path};
 use markup::{Document};
@@ -142,7 +142,7 @@ impl Formatter {
 
         for &(item, method) in methods {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
             try!(self.trait_method(item, method));
 
             try!(file.write_all(b"\

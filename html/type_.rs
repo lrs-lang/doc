@@ -2,9 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-use lrs::io::{Write};
-use lrs::iter::{IteratorExt};
+use std::io::{Write};
+use std::iter::{IteratorExt};
+use std::clone::{MaybeClone};
 
 use html::{path, Formatter, write_raw_type};
 use html::markup::{self};
@@ -64,7 +64,7 @@ impl Formatter {
 
         for &(impl_, item, method) in &methods {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
             try!(self.method(impl_, item, method));
 
             try!(file.write_all(b"\
@@ -143,7 +143,7 @@ impl Formatter {
 
         for &(impl_, item, method) in &methods {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
             try!(self.method(impl_, item, method));
 
             try!(file.write_all(b"\
@@ -242,7 +242,7 @@ impl Formatter {
             }
 
             try!(self.path.reserve(1));
-            self.path.push(try!(trait_item.name.as_ref().unwrap().clone()));
+            self.path.push(try!(trait_item.name.as_ref().unwrap().maybe_clone()));
             try!(self.trait_impl(&impls[i+1-num_impls..i+1]));
 
             try!(file.write_all(b"\

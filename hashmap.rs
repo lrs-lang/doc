@@ -2,18 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-use lrs::{mem};
-use lrs::vec::{Vec};
-use lrs::iter::{Iterator, IntoIterator};
-use lrs::rc::{Arc};
+use std::{mem};
+use std::vec::{Vec};
+use std::iter::{Iterator, IntoIterator};
+use std::rc::{Arc};
 
 use tree::{ItemData, DefId};
 
 const FACTOR: usize = 2;
 
 fn hash(d: DefId) -> u64 {
-    d.node << 32 | d.krate
+    d.index << 32 | d.krate
 }
 
 pub struct ItemMap {

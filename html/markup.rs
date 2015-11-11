@@ -2,11 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-use lrs::io::{Write};
-use lrs::string::{AsByteStr, ByteString, ByteStr};
-use lrs::util::{memchr};
-use lrs::bx::{Box};
+use std::io::{Write};
+use std::string::{AsByteStr, ByteString, ByteStr};
+use std::util::{memchr};
+use std::bx::{Box};
 
 use markup::*;
 

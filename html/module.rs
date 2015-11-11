@@ -2,8 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-use lrs::io::{Write};
+use std::io::{Write};
+use std::clone::{MaybeClone};
 
 use html::{path, markup, Formatter};
 use markup::{Document};
@@ -67,7 +67,7 @@ impl Formatter {
 
         for &(item, module) in &sub_mods {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
             try!(self.module(module, &item.docs));
 
             try!(file.write_all(b"\
@@ -135,7 +135,7 @@ impl Formatter {
 
         for &(item, kind, class) in &types {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
             try!(self.type_(&item));
 
             try!(file.write_all(b"\
@@ -206,7 +206,7 @@ impl Formatter {
 
         for &(item, func) in &functions {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
             try!(self.function(item, func));
 
             try!(file.write_all(b"\
@@ -270,7 +270,7 @@ impl Formatter {
 
         for &(item, constant) in &constants {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
             try!(self.constant(item, constant));
 
             try!(file.write_all(b"\
@@ -334,7 +334,7 @@ impl Formatter {
 
         for &(item, static_) in &statics {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
             try!(self.static_(item, static_));
 
             try!(file.write_all(b"\
@@ -401,7 +401,7 @@ impl Formatter {
 
         for &(item, macro_) in &macros {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
             try!(self.macro_(item, macro_));
 
             try!(file.write_all(b"\

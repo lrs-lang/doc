@@ -51,16 +51,13 @@
 //!
 //! RawDelim       <- '`'
 //! BoldDelim      <- '*'
-//! LinkStart      <- 'link:'
 //! SubstStart     <- '{'
 //! SubstEnd       <- '}'
 //! LinkEnd        <- ']'
-//! ColumnSep      <- '|'
+//! LinkStart      <- 'link:'
 //!
 //! EscapeSequence <- '\\' ('\\' / RawDelim / BoldDelim / SubstStart / LinkEnd /
 //!                         LinkStart)
-//!
-//! NonSpace       <- !' ' .
 //!
 //! UnnamedLink    <- 'link:' (!' ' !'[' .)+
 //! LinkText       <- (!']' ('\\]' / .))*
@@ -75,13 +72,12 @@
 //! 
 //! This is recursively applied to link/ref text and the content of bold but not raw.
 
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-use lrs::{mem};
-use lrs::bx::{Box};
-use lrs::util::{memchr};
-use lrs::string::{ByteString};
-use lrs::vec::{Vec};
-use lrs::io::{BufRead};
+use std::{mem};
+use std::bx::{Box};
+use std::util::{memchr};
+use std::string::{ByteString};
+use std::vec::{Vec};
+use std::io::{BufRead};
 
 pub struct Document {
     pub parts: Vec<Part>,

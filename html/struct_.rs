@@ -2,10 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-use lrs::io::{Write};
-use lrs::string::{ByteString};
-use lrs::iter::{IteratorExt};
+use std::io::{Write};
+use std::string::{ByteString};
+use std::iter::{IteratorExt};
 
 use html::{Formatter, where_predicates, angle_generics, write_raw_type};
 use html::markup::{self};

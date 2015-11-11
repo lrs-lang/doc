@@ -2,8 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-use lrs::io::{Write};
+use std::io::{Write};
+use std::clone::{MaybeClone};
 
 use html::{Formatter, markup, angle_generics, where_predicates, write_raw_type, path};
 use markup::{Document};
@@ -66,7 +66,7 @@ impl Formatter {
 
         for &(item, variant) in &variants {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
             try!(self.variant(enum_item, enum_, item, variant));
 
             try!(file.write_all(b"\

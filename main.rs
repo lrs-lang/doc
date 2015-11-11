@@ -4,15 +4,8 @@
 
 #![crate_type = "bin"]
 #![crate_name = "lrs_doc"]
-#![feature(plugin, no_std)]
-#![plugin(lrs_core_plugin)]
-#![no_std]
 
-#[macro_use] extern crate lrs;
-mod core { pub use lrs::core::*; }
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-
-use lrs::file::{File};
+use std::file::{File};
 
 #[macro_use] mod macros;
 mod json;

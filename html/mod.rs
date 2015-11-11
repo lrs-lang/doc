@@ -4,16 +4,15 @@
 
 // Beware of the shit code
 
-#[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-use lrs::io::{Write};
-use lrs::file::{self, File, Mode};
-use lrs::file::flags::{
+use std::io::{Write};
+use std::file::{self, File, Mode};
+use std::file::flags::{
     FILE_ONLY_DIRECTORY, FILE_PATH, FILE_WRITE_ONLY, FILE_TRUNCATE, FILE_CREATE,
 };
-use lrs::file::mode::{MODE_DIRECTORY, MODE_FILE};
-use lrs::string::{ByteString};
-use lrs::vec::{Vec};
-use lrs::iter::{IteratorExt};
+use std::file::mode::{MODE_DIRECTORY, MODE_FILE};
+use std::string::{ByteString};
+use std::vec::{Vec};
+use std::iter::{IteratorExt};
 
 use tree::*;
 
@@ -56,8 +55,7 @@ pub fn create(krate: Crate) -> Result {
 }
 
 mod path {
-    #[allow(unused_imports)] #[prelude_import] use lrs::prelude::*;
-    use lrs::string::{ByteString};
+    use std::string::{ByteString};
 
     pub fn path(parts: &[ByteString]) -> Result<ByteString> {
         let mut buf = try!(title(parts)).unwrap();
