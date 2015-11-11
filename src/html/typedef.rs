@@ -5,11 +5,10 @@
 use std::io::{Write};
 
 use html::{Formatter};
-use markup::{Document};
 use tree::*;
 
 impl Formatter {
-    pub fn typedef(&mut self, item: &ItemData, typedef: &Typedef) -> Result {
+    pub fn typedef(&mut self, _item: &ItemData, _typedef: &Typedef) -> Result {
         let mut file: Vec<_> = Vec::new();
 
         try!(self.head(&mut file, "Typedef "));

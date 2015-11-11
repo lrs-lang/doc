@@ -3,13 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io::{Write};
-use std::string::{ByteString};
-use std::iter::{IteratorExt};
 use std::rc::{Arc};
 
 use html::{Formatter, where_predicates, angle_generics, write_raw_type};
 use html::markup::{self};
-use markup::{Document};
 use tree::*;
 
 type Input<'a> = (&'a Arc<ItemData>, &'a Impl, Arc<ItemData>, &'a Type);
@@ -47,8 +44,8 @@ impl Formatter {
         Ok(())
     }
 
-    fn trait_impl_syntax<W: Write>(&mut self, file: &mut W, item_impl: &Arc<ItemData>,
-                                   impl_: &Impl, trait_item: &Arc<ItemData>,
+    fn trait_impl_syntax<W: Write>(&mut self, file: &mut W, _item_impl: &Arc<ItemData>,
+                                   impl_: &Impl, _trait_item: &Arc<ItemData>,
                                    trait_: &Type) -> Result {
         try!(file.write_all(b"\
             <h2>Syntax</h2>\

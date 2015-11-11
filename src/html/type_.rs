@@ -8,7 +8,6 @@ use std::clone::{MaybeClone};
 
 use html::{path, Formatter, write_raw_type};
 use html::markup::{self};
-use markup::{Document};
 use tree::*;
 
 impl Formatter {
@@ -153,7 +152,7 @@ impl Formatter {
             match method.self_ {
                 SelfTy::Static => { },
                 SelfTy::Value => { try!(file.write_all(b"self")); }
-                SelfTy::Borrowed(ref lt, mutable) => {
+                SelfTy::Borrowed(_, mutable) => {
                     try!(file.write_all(b"&"));
                     if mutable {
                         try!(file.write_all(b"mut "));
@@ -233,7 +232,7 @@ impl Formatter {
 
         let mut num_impls = 1;
 
-        for (i, &(impl_item, impl_, ref trait_item, trait_)) in impls.iter().enumerate() {
+        for (i, &(_impl_item, _impl_, ref trait_item, _trait_)) in impls.iter().enumerate() {
             if i + 1 < impls.len() {
                 if &*impls[i+1].2 as *const ItemData == &**trait_item as *const ItemData {
                     num_impls += 1;

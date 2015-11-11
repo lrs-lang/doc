@@ -34,7 +34,7 @@ impl Formatter {
     }
 
     fn method_syntax<W: Write>(&mut self, file: &mut W, impl_: &Impl,
-                               item: &ItemData, method: &Method) -> Result {
+                               _item: &ItemData, method: &Method) -> Result {
         try!(file.write_all(b"\
             <h2>Syntax</h2>\
             <pre>\

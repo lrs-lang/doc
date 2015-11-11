@@ -3,10 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io::{Write};
-use std::string::{ByteStr, ByteString};
+use std::string::{ByteString};
 
-use html::{Formatter, where_predicates, angle_generics, fn_in_out, write_raw_type,
-           write_abi, function};
+use html::{Formatter, where_predicates, angle_generics,  write_raw_type};
 use html::markup::{self};
 use tree::*;
 
@@ -70,7 +69,7 @@ fn syntax<W: Write>(file: &mut W, enum_item: &ItemData, enum_: &Enum, item: &Ite
             }
             try!(file.write_all(b")"));
         },
-        VariantKind::Struct(ref s) => {
+        VariantKind::Struct(_) => {
             try!(file.write_all(b"Struct variant documentation not implemented"));
         },
     }

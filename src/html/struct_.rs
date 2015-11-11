@@ -151,8 +151,8 @@ fn fields<W: Write>(mut file: &mut W, strukt: &Struct, docs: &Document) -> Resul
             Item::StructField(ref f) => f,
             _ => errexit!("struct field is not a StructField"),
         };
-        let t = match *field {
-            StructField::Typed(ref t) => t,
+        match *field {
+            StructField::Typed(_) => { },
             _ => continue,
         };
         try!(file.write_all(b"<tr><td>"));

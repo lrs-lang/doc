@@ -5,8 +5,7 @@
 use std::io::{Write};
 use std::string::{ByteStr};
 
-use html::{Formatter, where_predicates, angle_generics, fn_in_out, write_raw_type,
-           write_abi, function};
+use html::{Formatter, where_predicates, angle_generics, fn_in_out, write_abi, function};
 use html::markup::{self};
 use tree::*;
 

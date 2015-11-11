@@ -4,7 +4,7 @@
 
 use std::rc::{Arc};
 use std::vec::{Vec};
-use tree::{self, Walker, ItemData, ResolvedPath, Crate, Impl, Type, Item};
+use tree::{self, Walker, ItemData, ResolvedPath, Crate, Type, Item};
 use hashmap::{ItemMap};
 
 pub fn run(krate: &Crate) {

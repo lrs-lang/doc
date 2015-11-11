@@ -1,0 +1,6 @@
+*.html
+lrs_doc
+lrs_doc.d
+doc
+out.json
+doc.json

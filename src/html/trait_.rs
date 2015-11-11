@@ -8,7 +8,6 @@ use std::vec::{Vec};
 use std::clone::{MaybeClone};
 
 use html::{self, Formatter, markup, angle_generics, where_predicates, write_ty_param_bounds, write_raw_type, path};
-use markup::{Document};
 use tree::*;
 
 impl Formatter {
@@ -20,7 +19,7 @@ impl Formatter {
 
         try!(markup::short(&mut file, &item.docs.parts));
 
-        let (mut assocs, mut required, mut provided) = try!(collect_parts(trait_));
+        let (mut assocs, mut required, provided) = try!(collect_parts(trait_));
 
         try!(self.trait_syntax(&mut file, trait_, &assocs, &required, &provided));
         try!(assoc_types(&mut file, &mut assocs));
@@ -152,7 +151,7 @@ impl Formatter {
             match method.self_ {
                 SelfTy::Static => { },
                 SelfTy::Value => { try!(file.write_all(b"self")); }
-                SelfTy::Borrowed(ref lt, mutable) => {
+                SelfTy::Borrowed(_, mutable) => {
                     try!(file.write_all(b"&"));
                     if mutable {
                         try!(file.write_all(b"mut "));

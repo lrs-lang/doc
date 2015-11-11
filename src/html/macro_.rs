@@ -4,20 +4,19 @@
 
 use std::io::{Write};
 
-use html::{Formatter, markup, angle_generics, where_predicates, write_raw_type, path};
-use markup::{Document};
+use html::{Formatter, markup};
 use tree::*;
 
 impl Formatter {
-    pub fn constant(&mut self, item: &ItemData, constant: &Constant) -> Result {
+    pub fn macro_(&mut self, item: &ItemData, macro_: &Macro) -> Result {
         let mut file: Vec<_> = Vec::new();
 
-        try!(self.head(&mut file, "Constant "));
-        try!(self.h1(&mut file, "Constant "));
+        try!(self.head(&mut file, "Macro "));
+        try!(self.h1(&mut file, "Macro "));
 
         try!(markup::short(&mut file, &item.docs.parts));
 
-        try!(syntax(&mut file, item, constant));
+        try!(syntax(&mut file, item, macro_));
 
         try!(markup::remarks(&mut file, &item.docs.parts));
         try!(markup::examples(&mut file, &item.docs.parts));
@@ -30,22 +29,15 @@ impl Formatter {
     }
 }
 
-fn syntax<W: Write>(file: &mut W, item: &ItemData, constant: &Constant) -> Result {
+fn syntax<W: Write>(file: &mut W, _item: &ItemData, macro_: &Macro) -> Result {
     try!(file.write_all(b"\
         <h2>Syntax</h2>\
         <pre>\
-            const \
         "));
-    try!(file.write_all(item.name.as_ref().unwrap().as_ref()));
-    try!(file.write_all(b": "));
-    try!(write_raw_type(file, &constant.type_));
-    try!(file.write_all(b" = "));
-    try!(file.write_all(constant.expr.as_ref()));
+    try!(file.write_all(macro_.source.as_ref()));
     try!(file.write_all(b"\
-            ;\
         </pre>\
         "));
 
     Ok(())
 }
-

@@ -6,7 +6,6 @@ use std::io::{Write};
 use std::clone::{MaybeClone};
 
 use html::{Formatter, markup, angle_generics, where_predicates, write_raw_type, path};
-use markup::{Document};
 use tree::*;
 
 impl Formatter {
@@ -148,7 +147,7 @@ fn syntax<W: Write>(file: &mut W, item: &ItemData, enum_: &Enum) -> Result {
                 }
                 try!(file.write_all(b")"));
             },
-            VariantKind::Struct(ref s) => {
+            VariantKind::Struct(_) => {
                 try!(file.write_all(b"Struct variant documentation not implemented"));
             },
         }
