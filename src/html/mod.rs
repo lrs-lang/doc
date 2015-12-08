@@ -58,7 +58,7 @@ mod path {
     use std::string::{ByteString};
 
     pub fn path(parts: &[ByteString]) -> Result<ByteString> {
-        let mut buf = try!(title(parts)).unwrap();
+        let mut buf: Vec<_> = try!(title(parts)).into();
         try!(buf.push_all(b".html"));
         Ok(ByteString::from_vec(buf))
     }
