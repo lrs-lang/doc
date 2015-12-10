@@ -10,7 +10,6 @@ use std::string::{ByteString, AsByteStr};
 use std::bx::{Box};
 use std::rc::{Arc};
 use std::share::{RefCell};
-use std::clone::{MaybeClone};
 
 use json::{Value};
 use json::Slice as JSlice;
@@ -64,7 +63,7 @@ fn item_data(json: &Value) -> Result<Arc<ItemData>> {
 
     let name = match *fields[0].1.unwrap() {
         Value::String(ref s) => {
-            Some(s.maybe_clone().unwrap())
+            Some(s.try_to().unwrap())
         },
         _ => None,
     };
@@ -118,22 +117,22 @@ fn attribute(json: &Value) -> Result<Attribute> {
         b"Word" => {
             if fields.len() != 1 { error!("word attribute has unexpected structure") }
             let string = try!(collect_string(&fields[0], "word attribute", "fields[0]"));
-            let string = try!(string.maybe_clone());
+            let string = try!(string.try_to());
             Ok(Attribute::Word(string))
         },
         b"List" => {
             if fields.len() != 2 { error!("list attribute has unexpected structure") }
             let one = try!(collect_string(&fields[0], "list attribute", "fields[0]"));
             let two = try!(attributes(&fields[1]));
-            let one = try!(one.maybe_clone());
+            let one = try!(one.try_to());
             Ok(Attribute::List(one, two))
         },
         b"NameValue" => {
             if fields.len() != 2 { error!("list attribute has unexpected structure") }
             let one = try!(collect_string(&fields[0], "namevalue attribute", "fields[0]"));
             let two = try!(collect_string(&fields[1], "namevalue attribute", "fields[1]"));
-            let one = try!(one.maybe_clone());
-            let two = try!(two.maybe_clone());
+            let one = try!(one.try_to());
+            let two = try!(two.try_to());
             Ok(Attribute::NameValue(one, two))
         },
         _ => error!("unexpected attribute variant {:?}", variant),
@@ -239,7 +238,7 @@ fn path_segment(json: &Value) -> Result<PathSegment> {
 
     let name = try!(collect_string(fields[0].1.unwrap(), "path_segment", "name"));
     let params = try!(path_params(fields[1].1.unwrap()));
-    let name = try!(name.maybe_clone());
+    let name = try!(name.try_to());
 
     Ok(PathSegment { name: name, params: params })
 }
@@ -290,7 +289,7 @@ fn lifetime(json: &Value) -> Result<ByteString> {
     let mut fields = [("_field0", None)];
     try!(collect_object(json, &mut fields, "Lifetime"));
     let s = try!(collect_string(fields[0].1.unwrap(), "Lifetime", "_field0"));
-    let s = try!(s.maybe_clone());
+    let s = try!(s.try_to());
     Ok(s)
 }
 
@@ -392,7 +391,7 @@ fn poly_trait(json: &Value) -> Result<PolyTrait> {
 fn type_generic(fields: &JSlice) -> Result<Type> {
     if fields.len() != 1 { error!("generic type with {} fields", fields.len()); }
     let s = try!(collect_string(&fields[0], "generic type", "unnamed"));
-    Ok(Type::Generic(Generic { name: try!(s.maybe_clone()) }))
+    Ok(Type::Generic(Generic { name: try!(s.try_to()) }))
 }
 
 fn type_primitive(fields: &JSlice) -> Result<Type> {
@@ -447,7 +446,7 @@ fn type_bare_function(fields: &JSlice) -> Result<Type> {
         unsaf: unsaf,
         generics: generics,
         decl: decl,
-        abi: try!(abi.maybe_clone()),
+        abi: try!(abi.try_to()),
     };
 
     Ok(Type::BareFunction(BareFunction { decl: try!(Box::new()).set(bare_decl) }))
@@ -473,7 +472,7 @@ fn type_array(fields: &JSlice) -> Result<Type> {
     if fields.len() != 2 { error!("array type with {} fields", fields.len()); }
     let ty = try!(type_(&fields[0]));
     let len = try!(collect_string(&fields[1], "array type", "unnamed"));
-    Ok(Type::Array(Array { ty: try!(Box::new()).set(ty), initializer: try!(len.maybe_clone()) }))
+    Ok(Type::Array(Array { ty: try!(Box::new()).set(ty), initializer: try!(len.try_to()) }))
 }
 
 fn type_bottom(fields: &JSlice) -> Result<Type> {
@@ -505,7 +504,7 @@ fn type_ufcs_path(fields: &JSlice) -> Result<Type> {
     let up = UfcsPath {
         self_ty: try!(Box::new()).set(try!(type_(&fields[1]))),
         trait_: try!(Box::new()).set(try!(type_(&fields[2]))),
-        target: try!(name.maybe_clone()),
+        target: try!(name.try_to()),
     };
     Ok(Type::UfcsPath(up))
 }
@@ -535,7 +534,7 @@ fn type_binding(json: &Value) -> Result<TypeBinding> {
     try!(collect_object(json, &mut fields, "TypeBinding"));
     let name = try!(collect_string(fields[0].1.unwrap(), "type_bindings", "name"));
     let ty = try!(type_(fields[1].1.unwrap()));
-    let name = try!(name.maybe_clone());
+    let name = try!(name.try_to());
     Ok(TypeBinding { name: name, ty: ty })
 }
 
@@ -642,7 +641,7 @@ fn static_(json: &Value) -> Result<Static> {
     let type_ = try!(type_(fields[0].1.unwrap()));
     let mutable = try!(mutability(fields[1].1.unwrap()));
     let expr = try!(collect_string(fields[2].1.unwrap(), "Static", "expr"));
-    let expr = try!(expr.maybe_clone());
+    let expr = try!(expr.try_to());
     Ok(Static { type_: type_, mutable: mutable, expr: expr })
 }
 
@@ -657,7 +656,7 @@ fn constant(json: &Value) -> Result<Constant> {
     try!(collect_object(json, &mut fields, "Constant"));
     let type_ = try!(type_(fields[0].1.unwrap()));
     let expr = try!(collect_string(fields[1].1.unwrap(), "Constant", "expr"));
-    let expr = try!(expr.maybe_clone());
+    let expr = try!(expr.try_to());
     Ok(Constant { type_: type_, expr: expr })
 }
 
@@ -857,7 +856,7 @@ fn macro_(json: &Value) -> Result<Macro> {
     let mut fields = [("source", None)];
     try!(collect_object(json, &mut fields, "Macro"));
     let source = try!(collect_string(fields[0].1.unwrap(), "Macro", "source"));
-    let source = try!(source.maybe_clone());
+    let source = try!(source.try_to());
     Ok(Macro { source: source })
 }
 
@@ -928,7 +927,7 @@ fn ty_param(json: &Value) -> Result<TyParam> {
         _ => Some(try!(type_(fields[3].1.unwrap()))),
     };
     Ok(TyParam {
-        name: try!(name.maybe_clone()),
+        name: try!(name.try_to()),
         definition: try!(def_id(fields[1].1.unwrap())),
         bounds: try!(ty_param_bounds(fields[2].1.unwrap())),
         default: default,
@@ -1078,7 +1077,7 @@ fn argument(json: &Value) -> Result<Argument> {
     let ty = try!(type_(fields[0].1.unwrap()));
     let name = try!(collect_string(fields[1].1.unwrap(), "Argument", "name"));
     let id = try!(collect_int(fields[2].1.unwrap(), "Argument", "id"));
-    let name = try!(name.maybe_clone());
+    let name = try!(name.try_to());
     Ok(Argument { type_: ty, name: name, id: id as u64 })
 }
 

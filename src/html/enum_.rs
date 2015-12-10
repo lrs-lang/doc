@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io::{Write};
-use std::clone::{MaybeClone};
 
 use html::{Formatter, markup, angle_generics, where_predicates, write_raw_type, path};
 use tree::*;
@@ -65,7 +64,7 @@ impl Formatter {
 
         for &(item, variant) in &variants {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().try_to()));
             try!(self.variant(enum_item, enum_, item, variant));
 
             try!(file.write_all(b"\

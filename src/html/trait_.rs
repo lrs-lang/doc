@@ -5,7 +5,6 @@
 use std::io::{Write};
 use std::rc::{Arc};
 use std::vec::{Vec};
-use std::clone::{MaybeClone};
 
 use html::{self, Formatter, markup, angle_generics, where_predicates, write_ty_param_bounds, write_raw_type, path};
 use tree::*;
@@ -141,7 +140,7 @@ impl Formatter {
 
         for &(item, method) in methods {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().try_to()));
             try!(self.trait_method(item, method));
 
             try!(file.write_all(b"\

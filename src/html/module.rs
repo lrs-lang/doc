@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io::{Write};
-use std::clone::{MaybeClone};
 
 use html::{path, markup, Formatter};
 use markup::{Document};
@@ -67,7 +66,7 @@ impl Formatter {
 
         for &(item, module) in &sub_mods {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().try_to()));
             try!(self.module(module, &item.docs));
 
             try!(file.write_all(b"\
@@ -135,7 +134,7 @@ impl Formatter {
 
         for &(item, kind, class) in &types {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().try_to()));
             try!(self.type_(&item));
 
             try!(file.write_all(b"\
@@ -206,7 +205,7 @@ impl Formatter {
 
         for &(item, func) in &functions {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().try_to()));
             try!(self.function(item, func));
 
             try!(file.write_all(b"\
@@ -270,7 +269,7 @@ impl Formatter {
 
         for &(item, constant) in &constants {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().try_to()));
             try!(self.constant(item, constant));
 
             try!(file.write_all(b"\
@@ -334,7 +333,7 @@ impl Formatter {
 
         for &(item, static_) in &statics {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().try_to()));
             try!(self.static_(item, static_));
 
             try!(file.write_all(b"\
@@ -401,7 +400,7 @@ impl Formatter {
 
         for &(item, macro_) in &macros {
             try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().maybe_clone()));
+            self.path.push(try!(item.name.as_ref().unwrap().try_to()));
             try!(self.macro_(item, macro_));
 
             try!(file.write_all(b"\
