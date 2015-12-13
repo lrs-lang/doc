@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io::{Write};
-use std::string::{ByteString};
 use std::iter::{IteratorExt};
 
 use html::{Formatter, where_predicates, angle_generics, write_raw_type};
@@ -163,8 +162,8 @@ fn fields<W: Write>(mut file: &mut W, strukt: &Struct, docs: &Document) -> Resul
         }
         try!(file.write_all(b"</td><td>"));
         if strukt.struct_type == StructType::Tuple {
-            let field: ByteString = format!("{}", i + 1);
-            try!(markup::field_desc(file, &docs.parts, field.as_ref()));
+            let field = try!(format!("{}", i + 1));
+            try!(markup::field_desc(file, &docs.parts, &field));
         } else {
             try!(markup::all(file, &item.docs.parts));
         }

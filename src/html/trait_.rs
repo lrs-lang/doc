@@ -93,7 +93,7 @@ impl Formatter {
             }
 
             for &(i, m) in required {
-                html::method::method_syntax(file, m, i.name.as_ref().unwrap());
+                html::method::method_syntax(file, m, i.name.as_ref().unwrap().as_ref());
                 try!(file.write_all(b"\n"));
             }
 
@@ -105,7 +105,7 @@ impl Formatter {
             }
 
             for &(i, m) in provided {
-                html::method::method_syntax(file, m, i.name.as_ref().unwrap());
+                html::method::method_syntax(file, m, i.name.as_ref().unwrap().as_ref());
                 try!(file.write_all(b"\n"));
             }
 

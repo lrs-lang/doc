@@ -9,7 +9,6 @@
 use std::error::{Errno, InvalidArgument};
 use std::{mem};
 use std::vec::{Vec};
-use std::string::{ByteString};
 use std::io::{BufRead};
 use std::parse::{Parsable};
 
@@ -23,11 +22,11 @@ macro_rules! error {
 
 const ERR: Errno = InvalidArgument;
 
-pub type Object = Vec<(ByteString, Value)>;
+pub type Object = Vec<(Vec<u8>, Value)>;
 pub type Array = Vec<Value>;
 pub type Slice = [Value];
 pub enum Value {
-    String(ByteString),
+    String(Vec<u8>),
     Integer(i64),
     Object(Object),
     Array(Array),
@@ -93,7 +92,7 @@ fn object(data: &mut &[u8]) -> Result<Object> {
     Ok(pairs)
 }
 
-fn string(data: &mut &[u8]) -> Result<ByteString> {
+fn string(data: &mut &[u8]) -> Result<Vec<u8>> {
     whitespace(data);
     if data.len() == 0 || data[0] != b'"' { error!("String is empty or doesn't start with \""); }
     data.consume(1);
@@ -147,7 +146,7 @@ fn string(data: &mut &[u8]) -> Result<ByteString> {
     }
 
     data.consume(1);
-    Ok(ByteString::from_vec(string))
+    Ok(string)
 }
 
 fn integer(data: &mut &[u8]) -> Result<i64> {

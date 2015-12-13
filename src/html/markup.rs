@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io::{Write};
-use std::string::{AsByteStr, ByteString, ByteStr};
+use std::string::{ByteStr};
 use std::util::{memchr};
 use std::bx::{Box};
 
@@ -37,9 +37,9 @@ pub fn field_desc<W: Write>(w: &mut W, parts: &[Part], name: &[u8]) -> Result {
             Part::SectionHeader(_, _) => { },
             Part::Block(ref data) => {
                 for attr in &data.attributes {
-                    if attr.name.trim() == "field" {
+                    if attr.name.as_str().trim() == "field" {
                         if let Some(ref a) = attr.args {
-                            if a.trim() == name.as_byte_str() {
+                            if a.as_str().trim() == name {
                                 try!(block_data(w, data, true));
                                 return Ok(());
                             }
@@ -59,7 +59,7 @@ pub fn return_value<W: Write>(w: &mut W, parts: &[Part]) -> Result {
             Part::SectionHeader(_, _) => { },
             Part::Block(ref data) => {
                 for attr in &data.attributes {
-                    if attr.name.trim() == "return_value" {
+                    if attr.name.as_str().trim() == "return_value" {
                         try!(block_data(w, data, true));
                         return Ok(());
                     }
@@ -77,7 +77,7 @@ pub fn has_return_value(parts: &[Part]) -> bool {
             Part::SectionHeader(_, _) => { },
             Part::Block(ref data) => {
                 for attr in &data.attributes {
-                    if attr.name.trim() == "return_value" {
+                    if attr.name.as_str().trim() == "return_value" {
                         return true;
                     }
                 }
@@ -94,9 +94,9 @@ pub fn arg_desc<W: Write>(w: &mut W, parts: &[Part], name: &ByteStr) -> Result {
             Part::SectionHeader(_, _) => { },
             Part::Block(ref data) => {
                 for attr in &data.attributes {
-                    if attr.name.trim() == "argument" {
+                    if attr.name.as_str().trim() == "argument" {
                         if let Some(ref a) = attr.args {
-                            if a.trim() == name {
+                            if a.as_str().trim() == name {
                                 try!(block_data(w, data, true));
                                 return Ok(());
                             }
@@ -111,7 +111,7 @@ pub fn arg_desc<W: Write>(w: &mut W, parts: &[Part], name: &ByteStr) -> Result {
 
 fn text_block_is(block: &TextBlock, val: &str) -> bool {
     match block.inner {
-        Text::Raw(ref s) if s == val => true,
+        Text::Raw(ref s) if s.as_str() == val => true,
         _ => false,
     }
 }
@@ -199,15 +199,16 @@ pub fn text<W: Write>(mut w: &mut W, txt: &Text) -> Result {
     Ok(())
 }
 
-pub fn link<W: Write>(mut w: &mut W, link: &ByteString,
+pub fn link<W: Write>(mut w: &mut W, link: &Vec<u8>,
                       txt: &Option<Box<TextBlock>>) -> Result {
     try!(w.write_all(b"<a href=\""));
 
-    if link.starts_with("man:") {
+    if link.starts_with(b"man:") {
         if let Some(p) = memchr(link.as_ref(), b'(') {
             try!(write!(w,
                 "http://man7.org/linux/man-pages/man{}/{}.{}.html\">",
-                link[p+1..link.len()-1], link[4..p], link[p+1..link.len()-1]));
+                link.as_str()[p+1..link.len()-1], link.as_str()[4..p],
+                link.as_str()[p+1..link.len()-1]));
             match *txt {
                 Some(ref txt) => { try!(text_block(w, txt)); }
                 _ => { try!(w.write_all(link[4..].as_ref())); }
@@ -217,8 +218,8 @@ pub fn link<W: Write>(mut w: &mut W, link: &ByteString,
         }
     }
 
-    if link.starts_with("lrs") {
-        try!(write!(w, "./{}.html\">", link));
+    if link.starts_with(b"lrs") {
+        try!(write!(w, "./{}.html\">", link.as_str()));
         match *txt {
             Some(ref txt) => { try!(text_block(w, txt)); }
             _ => { try!(w.write_all(link.as_ref())); }
@@ -227,7 +228,7 @@ pub fn link<W: Write>(mut w: &mut W, link: &ByteString,
         return Ok(());
     }
 
-    try!(write!(w, "{}\">", link));
+    try!(write!(w, "{}\">", link.as_str()));
     match *txt {
         Some(ref txt) => { try!(text_block(w, txt)); }
         _ => { try!(w.write_all(link.as_ref())); }
@@ -252,7 +253,7 @@ pub fn block_data<W: Write>(mut w: &mut W, data: &BlockData,
                             show_hidden: bool) -> Result {
     if !show_hidden {
         for attr in &data.attributes {
-            let name = attr.name.trim();
+            let name = attr.name.as_str().trim();
             for &aname in &["hidden", "argument", "return_value", "field"][..] {
                 if name == aname {
                     return Ok(());
@@ -261,7 +262,7 @@ pub fn block_data<W: Write>(mut w: &mut W, data: &BlockData,
         }
     }
 
-    let is_quote = data.attributes.find(|a| a.name.trim() == "quote").is_some();
+    let is_quote = data.attributes.find(|a| a.name.as_str().trim() == "quote").is_some();
     if is_quote {
         try!(w.write_all(b"<blockquote>"));
     }

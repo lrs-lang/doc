@@ -5,7 +5,6 @@
 use std::rc::{Arc};
 use std::share::{RefCell};
 use std::vec::{Vec};
-use std::string::{ByteString};
 use std::bx::{Box};
 
 use markup::{Document};
@@ -15,7 +14,7 @@ pub struct Crate {
 }
 
 pub struct ItemData {
-    pub name: Option<ByteString>,
+    pub name: Option<Vec<u8>>,
     pub attrs: Vec<Attribute>,
     pub docs: Document,
     pub inner: Item,
@@ -26,9 +25,9 @@ pub struct ItemData {
 }
 
 pub enum Attribute {
-    Word(ByteString),
-    List(ByteString, Vec<Attribute>),
-    NameValue(ByteString, ByteString),
+    Word(Vec<u8>),
+    List(Vec<u8>, Vec<Attribute>),
+    NameValue(Vec<u8>, Vec<u8>),
 }
 
 pub enum Item {
@@ -79,13 +78,13 @@ pub enum StructType {
 }
 
 pub struct Generics {
-    pub lifetimes: Vec<ByteString>,
+    pub lifetimes: Vec<Vec<u8>>,
     pub type_params: Vec<TyParam>,
     pub where_predicates: Vec<WherePredicate>
 }
 
 pub struct TypeBinding {
-    pub name: ByteString,
+    pub name: Vec<u8>,
     pub ty: Type,
 }
 
@@ -95,7 +94,7 @@ pub enum PathParameters {
 }
 
 pub struct AngleBracketedPathParams {
-    pub lifetimes: Vec<ByteString>,
+    pub lifetimes: Vec<Vec<u8>>,
     pub ty_params: Vec<Type>,
     pub bindings: Vec<TypeBinding>,
 }
@@ -106,7 +105,7 @@ pub struct ParenthesizedPathParams {
 }
 
 pub struct PathSegment {
-    pub name: ByteString,
+    pub name: Vec<u8>,
     pub params: PathParameters
 }
 
@@ -146,7 +145,7 @@ pub struct ResolvedPath {
 }
 
 pub struct Generic {
-    pub name: ByteString,
+    pub name: Vec<u8>,
 }
 
 pub struct BareFunction {
@@ -163,7 +162,7 @@ pub struct Tuple {
 
 pub struct Array {
     pub ty: Box<Type>,
-    pub initializer: ByteString,
+    pub initializer: Vec<u8>,
 }
 
 pub struct Pointer {
@@ -172,13 +171,13 @@ pub struct Pointer {
 }
 
 pub struct Ref {
-    pub lifetime: Option<ByteString>,
+    pub lifetime: Option<Vec<u8>>,
     pub mutable: bool,
     pub ty: Box<Type>,
 }
 
 pub struct UfcsPath {
-    pub target: ByteString,
+    pub target: Vec<u8>,
     pub self_ty: Box<Type>,
     pub trait_: Box<Type>,
 }
@@ -188,14 +187,14 @@ pub struct HkltBound {
 }
 
 pub struct TyParam {
-    pub name: ByteString,
+    pub name: Vec<u8>,
     pub definition: DefId,
     pub bounds: Vec<TyParamBound>,
     pub default: Option<Type>,
 }
 
 pub enum TyParamBound {
-    Lifetime(ByteString),
+    Lifetime(Vec<u8>),
     Trait(TraitTyParamBound),
 }
 
@@ -206,7 +205,7 @@ pub struct TraitTyParamBound {
 
 pub struct PolyTrait {
     pub trait_: Type,
-    pub lifetimes: Vec<ByteString>
+    pub lifetimes: Vec<Vec<u8>>
 }
 
 pub enum WherePredicate {
@@ -221,8 +220,8 @@ pub struct BoundWherePredicate {
 }
 
 pub struct RegionWherePredicate {
-    pub lt: ByteString,
-    pub bounds: Vec<ByteString>,
+    pub lt: Vec<u8>,
+    pub bounds: Vec<Vec<u8>>,
 }
 
 pub struct EqWherePredicate {
@@ -231,13 +230,13 @@ pub struct EqWherePredicate {
 }
 
 pub struct Macro {
-    pub source: ByteString,
+    pub source: Vec<u8>,
 }
 
 pub struct Static {
     pub type_: Type,
     pub mutable: bool,
-    pub expr: ByteString,
+    pub expr: Vec<u8>,
 }
 
 pub struct DefaultImpl {
@@ -263,7 +262,7 @@ pub struct BareFunctionDecl {
     pub unsaf: bool,
     pub generics: Generics,
     pub decl: FnDecl,
-    pub abi: ByteString,
+    pub abi: Vec<u8>,
 }
 
 pub struct FnDecl {
@@ -329,19 +328,19 @@ pub struct Impl {
 pub enum SelfTy {
     Static,
     Value,
-    Borrowed(Option<ByteString>, bool),
+    Borrowed(Option<Vec<u8>>, bool),
     Explicit(Type),
 }
 
 pub struct Argument {
     pub type_: Type,
-    pub name: ByteString,
+    pub name: Vec<u8>,
     pub id: u64,
 }
 
 pub struct Constant {
     pub type_: Type,
-    pub expr: ByteString,
+    pub expr: Vec<u8>,
 }
 
 pub enum FuncRetTy {
@@ -441,7 +440,7 @@ pub fn walk_crate             <W: Walker> ( w: &mut W , val: &Crate             
 }
 
 /// pub struct ItemData {
-///     pub name: Option<ByteString>,
+///     pub name: Option<Vec<u8>>,
 ///     pub attrs: Vec<Attribute>,
 ///     pub docs: Document,
 ///     pub inner: Item,
@@ -453,9 +452,9 @@ pub fn walk_item_data         <W: Walker> ( w: &mut W , val: &Arc<ItemData>     
 }
 
 /// pub enum Attribute {
-///     Word(ByteString),
-///     List(ByteString, Vec<Attribute>),
-///     NameValue(ByteString, ByteString),
+///     Word(Vec<u8>),
+///     List(Vec<u8>, Vec<Attribute>),
+///     NameValue(Vec<u8>, Vec<u8>),
 /// }
 pub fn walk_attribute         <W: Walker> ( _: &mut W , _: &Attribute         ) {
 }
@@ -538,7 +537,7 @@ pub fn walk_struct_type       <W: Walker> ( _: &mut W , _: &StructType        ) 
 }
 
 /// pub struct Generics {
-///     pub lifetimes: Vec<ByteString>,
+///     pub lifetimes: Vec<Vec<u8>>,
 ///     pub type_params: Vec<TyParam>,
 ///     pub where_predicates: Vec<WherePredicate>
 /// }
@@ -581,7 +580,7 @@ pub fn walk_resolved_path<W: Walker> ( w: &mut W , val: &ResolvedPath ) {
 }
 
 /// pub struct Generic {
-///     pub name: ByteString,
+///     pub name: Vec<u8>,
 /// }
 pub fn walk_generic<W: Walker> ( _: &mut W , _: &Generic ) {
 }
@@ -594,7 +593,7 @@ pub fn walk_bare_function<W: Walker> ( w: &mut W , val: &BareFunction ) {
 }
 
 /// pub struct TypeBinding {
-///     pub name: ByteString,
+///     pub name: Vec<u8>,
 ///     pub ty: Type,
 /// }
 pub fn walk_type_binding      <W: Walker> ( w: &mut W , val: &TypeBinding       ) {
@@ -619,7 +618,7 @@ pub fn walk_slice<W: Walker> ( w: &mut W , val: &Slice ) {
 
 /// pub struct Array {
 ///     pub ty: Box<Type>,
-///     pub initializer: ByteString,
+///     pub initializer: Vec<u8>,
 /// }
 pub fn walk_array<W: Walker> ( w: &mut W, val: &Array ) {
     w.walk_type(&val.ty);
@@ -634,7 +633,7 @@ pub fn walk_pointer<W: Walker> ( w: &mut W , val: &Pointer ) {
 }
 
 /// pub struct Ref {
-///     pub lifetime: Option<ByteString>,
+///     pub lifetime: Option<Vec<u8>>,
 ///     pub mutable: bool,
 ///     pub ty: Box<Type>,
 /// }
@@ -643,7 +642,7 @@ pub fn walk_ref<W: Walker> ( w: &mut W , val: &Ref ) {
 }
 
 /// pub struct UfcsPath {
-///     pub target: ByteString,
+///     pub target: Vec<u8>,
 ///     pub self_ty: Box<Type>,
 ///     pub trait_: Box<Type>,
 /// }
@@ -681,8 +680,8 @@ pub fn walk_bound_where_predicate<W: Walker> ( w: &mut W , val: &BoundWherePredi
 }
 
 /// pub struct RegionWherePredicate {
-///     pub lt: ByteString,
-///     pub bounds: Vec<ByteString>,
+///     pub lt: Vec<u8>,
+///     pub bounds: Vec<Vec<u8>>,
 /// }
 pub fn walk_region_where_predicate<W: Walker> ( _: &mut W , _: &RegionWherePredicate ) {
 }
@@ -708,7 +707,7 @@ pub fn walk_path_parameters   <W: Walker> ( w: &mut W , val: &PathParameters    
 }
 
 /// pub struct AngleBracketedPathParam {
-///     pub lifetimes: Vec<ByteString>,
+///     pub lifetimes: Vec<Vec<u8>>,
 ///     pub ty_params: Vec<Type>,
 ///     pub bindings: Vec<TypeBinding>,
 /// }
@@ -735,7 +734,7 @@ pub fn walk_parenthesized_path_params<W: Walker> ( w: &mut W, val: &Parenthesize
 }
 
 /// pub struct PathSegment {
-///     pub name: ByteString,
+///     pub name: Vec<u8>,
 ///     pub params: PathParameters
 /// }
 pub fn walk_path_segment      <W: Walker> ( w: &mut W , val: &PathSegment       ) {
@@ -793,7 +792,7 @@ pub fn walk_type              <W: Walker> ( w: &mut W , val: &Type              
 }
 
 /// pub struct TyParam {
-///     pub name: ByteString,
+///     pub name: Vec<u8>,
 ///     pub definition: DefId,
 ///     pub bounds: Vec<TyParamBound>,
 ///     pub default: Option<Type>,
@@ -809,7 +808,7 @@ pub fn walk_ty_param          <W: Walker> ( w: &mut W , val: &TyParam           
 }
 
 /// pub enum TyParamBound {
-///     Lifetime(ByteString),
+///     Lifetime(Vec<u8>),
 ///     Trait(TraitTyParamBound),
 /// }
 pub fn walk_ty_param_bound    <W: Walker> ( w: &mut W , val: &TyParamBound      ) {
@@ -820,7 +819,7 @@ pub fn walk_ty_param_bound    <W: Walker> ( w: &mut W , val: &TyParamBound      
 
 /// pub struct PolyTrait {
 ///     pub trait_: Type,
-///     pub lifetimes: Vec<ByteString>
+///     pub lifetimes: Vec<Vec<u8>>
 /// }
 pub fn walk_poly_trait        <W: Walker> ( w: &mut W , val: &PolyTrait         ) {
     w.walk_type(&val.trait_);
@@ -840,7 +839,7 @@ pub fn walk_where_predicate   <W: Walker> ( w: &mut W , val: &WherePredicate    
 }
 
 /// pub struct Macro {
-///     pub source: ByteString,
+///     pub source: Vec<u8>,
 /// }
 pub fn walk_macro             <W: Walker> ( _: &mut W , _: &Macro             ) {
 }
@@ -848,7 +847,7 @@ pub fn walk_macro             <W: Walker> ( _: &mut W , _: &Macro             ) 
 /// pub struct Static {
 ///     pub type_: Type,
 ///     pub mutable: bool,
-///     pub expr: ByteString,
+///     pub expr: Vec<u8>,
 /// }
 pub fn walk_static            <W: Walker> ( w: &mut W , val: &Static            ) {
     w.walk_type(&val.type_);
@@ -881,7 +880,7 @@ pub fn walk_primitive         <W: Walker> ( _: &mut W , _: &Primitive         ) 
 ///     pub unsaf: bool,
 ///     pub generics: Generics,
 ///     pub decl: FnDecl,
-///     pub abi: ByteString,
+///     pub abi: Vec<u8>,
 /// }
 pub fn walk_bare_function_decl<W: Walker> ( w: &mut W , val: &BareFunctionDecl  ) {
     w.walk_generics(&val.generics);
@@ -1009,7 +1008,7 @@ pub fn walk_impl              <W: Walker> ( w: &mut W , val: &Impl         ) {
 /// pub enum SelfTy {
 ///     Static,
 ///     Value,
-///     Borrowed(Option<ByteString>, bool),
+///     Borrowed(Option<Vec<u8>>, bool),
 ///     Explicit(Type),
 /// }
 pub fn walk_self_ty           <W: Walker> ( w: &mut W , val: &SelfTy            ) {
@@ -1023,7 +1022,7 @@ pub fn walk_self_ty           <W: Walker> ( w: &mut W , val: &SelfTy            
 
 /// pub struct Argument {
 ///     pub type_: Type,
-///     pub name: ByteString,
+///     pub name: Vec<u8>,
 ///     pub id: u64,
 /// }
 pub fn walk_argument          <W: Walker> ( w: &mut W , val: &Argument          ) {
@@ -1032,7 +1031,7 @@ pub fn walk_argument          <W: Walker> ( w: &mut W , val: &Argument          
 
 /// pub struct Constant {
 ///     pub type_: Type,
-///     pub expr: ByteString,
+///     pub expr: Vec<u8>,
 /// }
 pub fn walk_constant          <W: Walker> ( w: &mut W , val: &Constant          ) {
     w.walk_type(&val.type_);

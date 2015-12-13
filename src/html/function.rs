@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io::{Write};
-use std::string::{ByteString};
 
 use html::{Formatter, write_abi, angle_generics, fn_in_out, where_predicates, markup};
 use markup::{Document};
@@ -33,7 +32,7 @@ impl Formatter {
     }
 }
 
-fn syntax<W: Write>(file: &mut W, func: &Func, name: &ByteString) -> Result {
+fn syntax<W: Write>(file: &mut W, func: &Func, name: &Vec<u8>) -> Result {
     try!(file.write_all(b"\
         <h2>Syntax</h2>\
         <pre>\
@@ -45,7 +44,7 @@ fn syntax<W: Write>(file: &mut W, func: &Func, name: &ByteString) -> Result {
         try!(file.write_all(b" "));
     }
     try!(file.write_all(b"fn "));
-    try!(file.write_all(name.as_ref()));
+    try!(file.write_all(name));
 
     let mut have_where_predicates = func.generics.where_predicates.len() > 0;
     have_where_predicates |= try!(angle_generics(file, &func.generics));
@@ -91,7 +90,7 @@ pub fn args<W: Write>(mut file: &mut W, decl: &FnDecl, docs: &Document) -> Resul
                 </td>\
                 <td>\
                 "));
-        try!(markup::arg_desc(file, &docs.parts, &arg.name));
+        try!(markup::arg_desc(file, &docs.parts, arg.name.as_str()));
         try!(file.write_all(b"\
                 </td>\
             <tr>\

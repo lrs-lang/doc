@@ -59,7 +59,7 @@ impl Formatter {
 
         // fn block
 
-        method_syntax(file, method, self.path.last().as_ref().unwrap());
+        method_syntax(file, method, self.path.last().unwrap().as_str());
 
         try!(file.write_all(b"\
                 \n}\

@@ -6,10 +6,10 @@
 
 use std::error::{self, InvalidArgument};
 use std::vec::{Vec};
-use std::string::{ByteString, AsByteStr};
 use std::bx::{Box};
 use std::rc::{Arc};
 use std::share::{RefCell};
+use std::string::{ByteStr};
 
 use json::{Value};
 use json::Slice as JSlice;
@@ -32,8 +32,8 @@ pub fn parse(json: &Value) -> Result<Crate> {
 
     let schema = try!(collect_string(fields[0].1.unwrap(), "input", "schema"));
     if schema != SCHEMA {
-        warning!("Unexpected schema. Expected {:?} found {:?}", SCHEMA.as_byte_str(),
-                 schema);
+        let s: &ByteStr = SCHEMA.as_ref();
+        warning!("Unexpected schema. Expected {:?} found {:?}", s, schema);
     }
 
     krate(fields[1].1.unwrap())
@@ -78,7 +78,7 @@ fn item_data(json: &Value) -> Result<Arc<ItemData>> {
     let mut doc: Vec<_> = Vec::new();
     for attr in &attrs {
         if let Attribute::NameValue(ref n, ref v) = *attr {
-            if n == "doc" {
+            if n.as_str() == "doc" {
                 try!(doc.push_all(v.as_ref()));
                 try!(doc.push_all(b"\n"));
             }
@@ -194,7 +194,7 @@ fn item(json: &Value) -> Result<Item> {
 fn item_import(fields: &JSlice) -> Result<Item> {
     if fields.len() != 1 { error!("import item with {} fields", fields.len()); }
     let (variant, fields) = try!(collect_enum(&fields[0], "Import"));
-    if variant != "GlobImport" { error!("unexpected import variant: {:?}", variant); }
+    if variant.as_str() != "GlobImport" { error!("unexpected import variant: {:?}", variant); }
     if fields.len() != 1 { error!("glob import with {} fields", fields.len()); }
     let source = try!(glob_import(&fields[0]));
     Ok(Item::GlobImport(source))
@@ -276,7 +276,7 @@ fn path_params(params: &Value) -> Result<PathParameters> {
     }
 }
 
-fn lifetimes(json: &Value) -> Result<Vec<ByteString>> {
+fn lifetimes(json: &Value) -> Result<Vec<Vec<u8>>> {
     let array = try!(collect_array(json, "?", "lifetimes"));
     let mut vec = try!(Vec::with_capacity(array.len()));
     for l in array {
@@ -285,7 +285,7 @@ fn lifetimes(json: &Value) -> Result<Vec<ByteString>> {
     Ok(vec)
 }
 
-fn lifetime(json: &Value) -> Result<ByteString> {
+fn lifetime(json: &Value) -> Result<Vec<u8>> {
     let mut fields = [("_field0", None)];
     try!(collect_object(json, &mut fields, "Lifetime"));
     let s = try!(collect_string(fields[0].1.unwrap(), "Lifetime", "_field0"));
@@ -440,7 +440,7 @@ fn type_bare_function(fields: &JSlice) -> Result<Type> {
     let decl = try!(fn_decl(fields_[2].1.unwrap()));
     let abi = try!(collect_string(fields_[3].1.unwrap(), "bare function type", "abi"));
     
-    let unsaf = unsafety == "Unsafe";
+    let unsaf = unsafety.as_str() == "Unsafe";
 
     let bare_decl = BareFunctionDecl {
         unsaf: unsaf,
@@ -592,7 +592,7 @@ fn func(json: &Value) -> Result<Func> {
     let generics = try!(generics(fields[1].1.unwrap()));
     let unsafety = try!(collect_string(fields[2].1.unwrap(), "Func", "unsafety"));
     let abi = try!(abi(fields[3].1.unwrap()));
-    let unsaf = unsafety == "Unsafe";
+    let unsaf = unsafety.as_str() == "Unsafe";
     Ok(Func {
         decl: decl,
         generics: generics,
@@ -894,7 +894,7 @@ fn default_impl(json: &Value) -> Result<DefaultImpl> {
 
 fn unsafety(json: &Value) -> Result<bool> {
     let string = try!(collect_string(json, "?", "unsafety"));
-    Ok(string == "Unsafe")
+    Ok(string.as_str() == "Unsafe")
 }
 
 fn generics(json: &Value) -> Result<Generics> {
@@ -984,7 +984,7 @@ fn abi(json: &Value) -> Result<Abi> {
         b"System"        => Ok(Abi::System),
         b"RustIntrinsic" => Ok(Abi::RustIntrinsic),
         b"RustCall"      => Ok(Abi::RustCall),
-        _ => error!("Unexpected Abi variant: {:?}", s),
+        _ => error!("Unexpected Abi variant: {:?}", s.as_str()),
     }
 }
 
@@ -1052,12 +1052,12 @@ fn self_ty(json: &Value) -> Result<SelfTy> {
 
 fn mutability(json: &Value) -> Result<bool> {
     let s = try!(collect_string(json, "?", "mutability"));
-    Ok(s == "Mutable")
+    Ok(s.as_str() == "Mutable")
 }
 
 fn polarity(json: &Value) -> Result<bool> {
     let s = try!(collect_string(json, "?", "polarity"));
-    Ok(s == "Negative")
+    Ok(s.as_str() == "Negative")
 }
 
 fn arguments(json: &Value) -> Result<Vec<Argument>> {
@@ -1081,7 +1081,7 @@ fn argument(json: &Value) -> Result<Argument> {
     Ok(Argument { type_: ty, name: name, id: id as u64 })
 }
 
-fn collect_string<'a>(json: &'a Value, obj: &str, field: &str) -> Result<&'a ByteString> {
+fn collect_string<'a>(json: &'a Value, obj: &str, field: &str) -> Result<&'a Vec<u8>> {
     match *json {
         Value::String(ref s) => Ok(s),
         _ => error!("field {} on {} is not a string", field, obj),
@@ -1104,7 +1104,7 @@ fn collect_object<'a>(obj: &'a Value, fields: &mut [(&str, Option<&'a Value>)],
 
     for field in obj {
         for rfield in &mut *fields {
-            if &field.0 == rfield.0 {
+            if field.0.as_str() == rfield.0 {
                 rfield.1 = Some(&field.1);
             }
         }
@@ -1133,7 +1133,7 @@ fn collect_bool<'a>(json: &'a Value, obj: &str, field: &str) -> Result<bool> {
     }
 }
 
-fn collect_enum<'a>(json: &'a Value, obj: &str) -> Result<(&'a ByteString, &'a JSlice)> {
+fn collect_enum<'a>(json: &'a Value, obj: &str) -> Result<(&'a Vec<u8>, &'a JSlice)> {
     match *json {
         Value::String(ref s) => return Ok((s, &[])),
         _ => { },

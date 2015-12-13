@@ -10,7 +10,6 @@ use std::file::flags::{
     FILE_ONLY_DIRECTORY, FILE_PATH, FILE_WRITE_ONLY, FILE_TRUNCATE, FILE_CREATE,
 };
 use std::file::mode::{MODE_DIRECTORY, MODE_FILE};
-use std::string::{ByteString};
 use std::vec::{Vec};
 use std::iter::{IteratorExt};
 
@@ -41,7 +40,7 @@ pub fn create(krate: Crate) -> Result {
     };
 
     let mut parts = try!(Vec::with_capacity(1));
-    parts.push(ByteString::from_vec(try!(b"lrs".to_owned())));
+    parts.push(try!("lrs".try_to()));
 
     let _ = file::create_dir("doc", MODE_DIRECTORY);
     let dir = try!(File::open("doc", FILE_ONLY_DIRECTORY | FILE_PATH, Mode(0)));
@@ -55,31 +54,29 @@ pub fn create(krate: Crate) -> Result {
 }
 
 mod path {
-    use std::string::{ByteString};
-
-    pub fn path(parts: &[ByteString]) -> Result<ByteString> {
+    pub fn path(parts: &[Vec<u8>]) -> Result<Vec<u8>> {
         let mut buf: Vec<_> = try!(title(parts)).into();
         try!(buf.push_all(b".html"));
-        Ok(ByteString::from_vec(buf))
+        Ok(buf)
     }
 
-    pub fn title(parts: &[ByteString]) -> Result<ByteString> {
+    pub fn title(parts: &[Vec<u8>]) -> Result<Vec<u8>> {
         if parts.len() == 0 {
-            return Ok(ByteString::new());
+            return Ok(Vec::new());
         }
         let mut buf = Vec::new();
-        try!(buf.push_all(parts[0].as_ref()));
+        try!(buf.push_all(&parts[0]));
         for part in &parts[1..] {
             try!(buf.push_all(b"::"));
-            try!(buf.push_all(part.as_ref()));
+            try!(buf.push_all(&part));
         }
-        Ok(ByteString::from_vec(buf))
+        Ok(buf)
     }
 }
 
 
 struct Formatter {
-    path: Vec<ByteString>,
+    path: Vec<Vec<u8>>,
     dir: File,
 }
 
@@ -170,7 +167,7 @@ fn write_ty_param_bound<W: Write>(file: &mut W, bound: &TyParamBound) -> Result 
     Ok(())
 }
 
-fn write_angle_params<W: Write>(file: &mut W, lts: &[ByteString], types: &[Type],
+fn write_angle_params<W: Write>(file: &mut W, lts: &[Vec<u8>], types: &[Type],
                                 bindings: &[TypeBinding]) -> Result {
     let mut first = true;
     for lt in lts {

@@ -18,7 +18,7 @@ impl Formatter {
 
         try!(markup::short(&mut file, &item.docs.parts));
 
-        try!(syntax(&mut file, method, item.name.as_ref().unwrap()));
+        try!(syntax(&mut file, method, item.name.as_ref().unwrap().as_ref()));
 
         try!(function::args(&mut file, &method.decl, &item.docs));
         try!(function::return_value(&mut file, &method.decl, &item.docs));

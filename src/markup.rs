@@ -75,7 +75,6 @@
 use std::{mem};
 use std::bx::{Box};
 use std::util::{memchr};
-use std::string::{ByteString};
 use std::vec::{Vec};
 use std::io::{BufRead};
 
@@ -94,13 +93,13 @@ pub struct BlockData {
 }
 
 pub struct Attribute {
-    pub name: ByteString,
-    pub args: Option<ByteString>,
+    pub name: Vec<u8>,
+    pub args: Option<Vec<u8>>,
 }
 
 pub enum Block {
     Grouped(Vec<BlockData>),
-    Code(ByteString),
+    Code(Vec<u8>),
     List(Vec<ListEl>),
     Table(Vec<TableRow>),
     Text(TextBlock),
@@ -126,9 +125,9 @@ pub struct TextBlock {
 }
 
 pub enum Text {
-    Raw(ByteString),
+    Raw(Vec<u8>),
     Nested(Vec<TextBlock>),
-    Link(ByteString, Option<Box<TextBlock>>),
+    Link(Vec<u8>, Option<Box<TextBlock>>),
 }
 
 pub enum TextAttr {
@@ -265,8 +264,8 @@ impl<R: BufRead> DocParser<R> {
         };
 
         let line = try!(self.next_line());
-        let name = try!(line[1..end].to_owned());
-        let val = try!(line[end+2..].to_owned());
+        let name = try!(line[1..end].try_to());
+        let val = try!(line[end+2..].try_to());
         try!(self.vars.reserve(1));
         self.vars.push((name, val));
         Ok(true)
@@ -325,11 +324,11 @@ impl<R: BufRead> DocParser<R> {
         line = &line[1..line.len()-1];
 
         if let Some(pos) = memchr(line, b',') {
-            let name = ByteString::from_vec(try!(line[..pos].to_owned()));
-            let args = ByteString::from_vec(try!(line[pos+1..].to_owned()));
+            let name = try!(line[..pos].try_to());
+            let args = try!(line[pos+1..].try_to());
             Ok(Some(Attribute { name: name, args: Some(args) }))
         } else {
-            let name = ByteString::from_vec(try!(line.to_owned()));
+            let name = try!(line.try_to());
             Ok(Some(Attribute { name: name, args: None }))
         }
     }
@@ -404,7 +403,7 @@ impl<R: BufRead> DocParser<R> {
 
         let block = BlockData {
             attributes: Vec::new(),
-            inner: Block::Code(ByteString::from_vec(code)),
+            inner: Block::Code(code),
         };
 
         try!(self.parts.reserve(1));
@@ -516,7 +515,7 @@ impl<R: BufRead> DocParser<R> {
             };
             let line = try!(self.next_line());
             let el = if simple {
-                let mut buf: Vec<_> = try!(line[2..].to_owned());
+                let mut buf: Vec<_> = try!(line[2..].try_to());
                 while try!(self.peek_line()).starts_with(b"  ") {
                     let line = try!(self.next_line());
                     try!(buf.push_all(b" "));
@@ -585,7 +584,7 @@ impl<'a> TextParser<'a> {
     }
 
     fn subst(text: &[u8], vars: &[(Vec<u8>, Vec<u8>)]) -> Result<Vec<u8>> {
-        let mut text: Vec<_> = try!(text.to_owned());
+        let mut text: Vec<_> = try!(text.try_to());
         let mut next = try!(Vec::with_capacity(text.len()));
         loop {
             let mut did_substitute = false;
@@ -665,14 +664,14 @@ impl<'a> TextParser<'a> {
         }
 
         let (attribute, block) = match (text.past.len(), text.current) {
-            (0, Some(c)) => (None, Text::Raw(ByteString::from_vec(c))),
-            (0, None   ) => (None, Text::Raw(ByteString::new())),
+            (0, Some(c)) => (None, Text::Raw(c)),
+            (0, None   ) => (None, Text::Raw(Vec::new())),
             (1, None   ) => {
                 let TextBlock { attribute, inner } = text.past.pop().unwrap();
                 (attribute, inner)
             },
             (_, Some(c)) => {
-                let raw = ByteString::from_vec(c);
+                let raw = c;
                 try!(text.past.reserve(1));
                 text.past.push(TextBlock { attribute: None, inner: Text::Raw(raw) });
                 (None, Text::Nested(text.past))
@@ -716,7 +715,7 @@ impl<'a> TextParser<'a> {
 
     fn finish_raw(&mut self) -> Result {
         if let Some(c) = self.current.take() {
-            let raw = ByteString::from_vec(c);
+            let raw = c;
             try!(self.past.reserve(1));
             self.past.push(TextBlock { attribute: None, inner: Text::Raw(raw) });
         }
@@ -751,7 +750,7 @@ impl<'a> TextParser<'a> {
         let block = if cont {
             try!(TextParser::parse(&text))
         } else {
-            TextBlock { attribute: None, inner: Text::Raw(ByteString::from_vec(text)) }
+            TextBlock { attribute: None, inner: Text::Raw(text) }
         };
         let mut block = if block.attribute.is_none() {
             block
@@ -800,7 +799,7 @@ impl<'a> TextParser<'a> {
 
         self.finish_raw();
 
-        let link = ByteString::from_vec(try!(self.text[b"link:".len()..i].to_owned()));
+        let link = try!(self.text[b"link:".len()..i].try_to());
         let link_text = match link_text {
             Some(t) => Some(try!(Box::new()).set(try!(TextParser::parse(&t)))),
             _ => None,

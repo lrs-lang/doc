@@ -4,6 +4,7 @@
 
 #![crate_type = "bin"]
 #![crate_name = "lrs_doc"]
+#![feature(default_type_parameter_fallback)]
 
 use std::file::{File};
 

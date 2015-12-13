@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io::{Write};
-use std::string::{ByteString};
 
 use html::{Formatter, where_predicates, angle_generics,  write_raw_type};
 use html::markup::{self};
@@ -109,8 +108,8 @@ fn fields<W: Write>(mut file: &mut W, item: &ItemData, variant: &Variant) -> Res
         try!(file.write_all(b"<tr><td>"));
         try!(write!(file, "{}", i + 1));
         try!(file.write_all(b"</td><td>"));
-        let field: ByteString = format!("{}", i + 1);
-        try!(markup::field_desc(file, &item.docs.parts, field.as_ref()));
+        let field = try!(format!("{}", i + 1));
+        try!(markup::field_desc(file, &item.docs.parts, &field));
         try!(file.write_all(b"</td></tr>"));
     }
 
