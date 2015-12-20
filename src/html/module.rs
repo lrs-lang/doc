@@ -16,7 +16,6 @@ impl Formatter {
         try!(self.h1(&mut file, "Module "));
 
         try!(markup::short(&mut file, &docs.parts));
-        try!(markup::description(&mut file, &docs.parts));
 
         try!(self.module_modules(&mut file, module));
         try!(self.module_types(&mut file, module));
@@ -25,6 +24,7 @@ impl Formatter {
         try!(self.module_statics(&mut file, module));
         try!(self.module_macros(&mut file, module));
 
+        try!(markup::description(&mut file, &docs.parts));
         try!(markup::remarks(&mut file, &docs.parts));
         try!(markup::examples(&mut file, &docs.parts));
         try!(markup::see_also(&mut file, &docs.parts));

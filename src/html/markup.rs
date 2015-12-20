@@ -12,7 +12,7 @@ use markup::*;
 pub fn all<W: Write>(w: &mut W, parts: &[Part]) -> Result {
     for part in parts {
         match *part {
-            Part::SectionHeader(n, ref text) => try!(section_header(w, n, text)),
+            Part::SectionHeader(n, ref text) => try!(section_header(w, n, text, false)),
             Part::Block(ref data) => try!(block_data(w, data, false)),
         }
     }
@@ -23,7 +23,7 @@ pub fn short<W: Write>(w: &mut W, parts: &[Part]) -> Result {
     for part in parts {
         match *part {
             Part::SectionHeader(1, _) => break,
-            Part::SectionHeader(n, ref text) => try!(section_header(w, n, text)),
+            Part::SectionHeader(n, ref text) => try!(section_header(w, n, text, false)),
             Part::Block(ref data) => try!(block_data(w, data, false)),
         }
     }
@@ -117,22 +117,22 @@ fn text_block_is(block: &TextBlock, val: &str) -> bool {
 }
 
 pub fn description<W: Write>(w: &mut W, parts: &[Part]) -> Result {
-    section(w, parts, "Description")
+    section(w, parts, "Description", false)
 }
 
 pub fn remarks<W: Write>(w: &mut W, parts: &[Part]) -> Result {
-    section(w, parts, "Remarks")
+    section(w, parts, "Remarks", true)
 }
 
 pub fn examples<W: Write>(w: &mut W, parts: &[Part]) -> Result {
-    section(w, parts, "Examples")
+    section(w, parts, "Examples", true)
 }
 
 pub fn see_also<W: Write>(w: &mut W, parts: &[Part]) -> Result {
-    section(w, parts, "See also")
+    section(w, parts, "See also", false)
 }
 
-pub fn section<W: Write>(w: &mut W, parts: &[Part], name: &str) -> Result {
+pub fn section<W: Write>(w: &mut W, parts: &[Part], name: &str, info: bool) -> Result {
     let pos = parts.find(|p| {
         match *p {
             Part::SectionHeader(1, ref n) if text_block_is(n, name) => true,
@@ -144,25 +144,28 @@ pub fn section<W: Write>(w: &mut W, parts: &[Part], name: &str) -> Result {
         _ => return Ok(()),
     };
     match parts[pos] {
-        Part::SectionHeader(1, ref n) => try!(section_header(w, 1, n)),
+        Part::SectionHeader(1, ref n) => try!(section_header(w, 1, n, info)),
         _ => { },
     }
     for part in &parts[pos+1..] {
         match *part {
             Part::SectionHeader(1, _) => break,
-            Part::SectionHeader(n, ref text) => try!(section_header(w, n, text)),
+            Part::SectionHeader(n, ref text) => try!(section_header(w, n, text, false)),
             Part::Block(ref data) => try!(block_data(w, data, false)),
         }
     }
     Ok(())
 }
 
-pub fn section_header<W: Write>(mut w: &mut W, depth: usize,
-                                block: &TextBlock) -> Result {
+pub fn section_header<W: Write>(mut w: &mut W, depth: usize, block: &TextBlock,
+                                info: bool) -> Result {
 
     try!(write!(w, "<h{}>", depth + 1));
     try!(text_block(w, block));
     try!(write!(w, "</h{}>", depth + 1));
+    if info {
+        try!(w.write_all(br#"<p class="info_head">This section is informative.</p>"#));
+    }
     Ok(())
 }
 
@@ -262,6 +265,12 @@ pub fn block_data<W: Write>(mut w: &mut W, data: &BlockData,
         }
     }
 
+    let is_info = data.attributes.find(|a| a.name.as_str().trim() == "info").is_some();
+    if is_info {
+        try!(w.write_all(br#"<div class="informative">"#));
+        try!(w.write_all(br#"<p class="info_head">This block is informative.</p>"#));
+    }
+
     let is_quote = data.attributes.find(|a| a.name.as_str().trim() == "quote").is_some();
     if is_quote {
         try!(w.write_all(b"<blockquote>"));
@@ -319,6 +328,10 @@ pub fn block_data<W: Write>(mut w: &mut W, data: &BlockData,
 
     if is_quote {
         try!(w.write_all(b"</blockquote>"));
+    }
+
+    if is_info {
+        try!(w.write_all(b"</div>"));
     }
 
     Ok(())

@@ -30,6 +30,7 @@ impl Formatter {
         try!(self.trait_methods(&mut file, &required));
         try!(self.type_trait_impls(&mut file, item));
 
+        try!(markup::description(&mut file, &item.docs.parts));
         try!(markup::remarks(&mut file, &item.docs.parts));
         try!(markup::examples(&mut file, &item.docs.parts));
         try!(markup::see_also(&mut file, &item.docs.parts));

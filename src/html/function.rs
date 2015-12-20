@@ -21,6 +21,7 @@ impl Formatter {
         try!(args(&mut file, &func.decl, &item.docs));
         try!(return_value(&mut file, &func.decl, &item.docs));
 
+        try!(markup::description(&mut file, &item.docs.parts));
         try!(markup::remarks(&mut file, &item.docs.parts));
         try!(markup::examples(&mut file, &item.docs.parts));
         try!(markup::see_also(&mut file, &item.docs.parts));

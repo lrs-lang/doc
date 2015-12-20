@@ -21,6 +21,7 @@ impl Formatter {
         try!(syntax(&mut file, enum_item, enum_, item, variant));
         try!(fields(&mut file, item, variant));
 
+        try!(markup::description(&mut file, &item.docs.parts));
         try!(markup::remarks(&mut file, &item.docs.parts));
         try!(markup::examples(&mut file, &item.docs.parts));
         try!(markup::see_also(&mut file, &item.docs.parts));

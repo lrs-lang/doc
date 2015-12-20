@@ -4,7 +4,7 @@
 
 //! Parser for the rustdoc JSON output
 
-use std::error::{self, InvalidArgument};
+use std::error::{self};
 use std::vec::{Vec};
 use std::bx::{Box};
 use std::rc::{Arc};

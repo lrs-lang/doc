@@ -23,6 +23,7 @@ impl Formatter {
         try!(function::args(&mut file, &method.decl, &item.docs));
         try!(function::return_value(&mut file, &method.decl, &item.docs));
 
+        try!(markup::description(&mut file, &item.docs.parts));
         try!(markup::remarks(&mut file, &item.docs.parts));
         try!(markup::examples(&mut file, &item.docs.parts));
         try!(markup::see_also(&mut file, &item.docs.parts));

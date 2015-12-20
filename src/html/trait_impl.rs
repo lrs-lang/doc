@@ -33,6 +33,7 @@ impl Formatter {
         for &(impl_item, impl_, ref trait_item, trait_) in impls {
             try!(self.trait_impl_syntax(&mut file, impl_item, impl_, trait_item, trait_));
 
+            try!(markup::description(&mut file, &impl_item.docs.parts));
             try!(markup::remarks(&mut file, &impl_item.docs.parts));
             try!(markup::examples(&mut file, &impl_item.docs.parts));
             try!(markup::see_also(&mut file, &impl_item.docs.parts));
