@@ -40,7 +40,9 @@ impl Formatter {
 
         for item in &module.items {
             match item.inner {
-                Item::Module(ref m) => sub_mods.push((item, m)),
+                Item::Module(ref m) => {
+                    sub_mods.push((item, m));
+                },
                 _ => { },
             }
         }
@@ -65,8 +67,7 @@ impl Formatter {
                     "));
 
         for &(item, module) in &sub_mods {
-            try!(self.path.reserve(1));
-            self.path.push(try!(item.name.as_ref().unwrap().try_to()));
+            try!(self.path.push(try!(item.name.as_ref().unwrap().try_to())));
             try!(self.module(module, &item.docs));
 
             try!(file.write_all(b"\
@@ -108,8 +109,8 @@ impl Formatter {
                 Item::Enum(_)    => types.push((item, "Enum",    "enum_hl")),
                 Item::Typedef(_) => types.push((item, "Typedef", "typedef_hl")),
                 Item::Trait(_)   => types.push((item, "Trait",   "trait_hl")),
-                _ => { },
-            }
+                _ => Ok(()),
+            };
         }
 
         if types.len() == 0 {
@@ -180,8 +181,8 @@ impl Formatter {
         for item in &module.items {
             match item.inner {
                 Item::Func(ref f) => functions.push((item, f)),
-                _ => { },
-            }
+                _ => Ok(()),
+            };
         }
 
         if functions.len() == 0 {
@@ -244,8 +245,8 @@ impl Formatter {
         for item in &module.items {
             match item.inner {
                 Item::Constant(ref c) => constants.push((item, c)),
-                _ => { },
-            }
+                _ => Ok(()),
+            };
         }
 
         if constants.len() == 0 {
@@ -308,8 +309,8 @@ impl Formatter {
         for item in &module.items {
             match item.inner {
                 Item::Static(ref s) => statics.push((item, s)),
-                _ => { },
-            }
+                _ => Ok(()),
+            };
         }
 
         if statics.len() == 0 {

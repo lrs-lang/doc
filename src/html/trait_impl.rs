@@ -75,7 +75,7 @@ impl Formatter {
 
         for item in &impl_.items {
             if let Item::Typedef(ref a) = item.inner {
-                try!(assocs.try_push((item, a)));
+                try!(assocs.push((item, a)));
             }
         }
 

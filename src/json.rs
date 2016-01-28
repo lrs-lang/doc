@@ -80,8 +80,7 @@ fn object(data: &mut &[u8]) -> Result<Object> {
         if data.len() == 0 || data[0] != b':' { error!("Can't find : in object"); }
         data.consume(1);
         let value = try!(value(data));
-        try!(pairs.reserve(1));
-        pairs.push((key, value));
+        try!(pairs.push((key, value)));
         whitespace(data);
         if data.len() == 0 { error!("Can't find , or }} in object"); }
         if data[0] == b'}' { break; }
@@ -135,7 +134,7 @@ fn string(data: &mut &[u8]) -> Result<Vec<u8>> {
                     continue;
                 },
                 _ => error!("Unknown escape character: {:?}", data[0] as char),
-            }
+            };
         } else if data[0] == b'\\' {
             escape = true;
         } else {
